@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum ScheduleCategory {
+  HEALTH
+  STUDY
+  WORKOUT
+  WORK
+  SLEEP
+  WATER
+  PERSONAL
+  OTHER
+}
+
+enum ScheduleSourceType {
+  MANUAL
+  AI_PROMPT
+  MEDICAL_IMAGE
+  IMPORTED_TEXT
+}
+
+enum ReminderStatus {
+  ACTIVE
+  PAUSED
+  FINISHED
+  CANCELED
+}
+
+enum ReminderAction {
+  DONE
+  SNOOZED
+  SKIPPED
+  MISSED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  schedules    Schedule[]
+  reminderLogs ReminderLog[]
+  aiRequests   AiRequest[]
+}
+
+model Schedule {
+  id          String             @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  category    ScheduleCategory   @default(OTHER)
+  sourceType  ScheduleSourceType @default(MANUAL)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminders   Reminder[]
+}
+
+model Reminder {
+  id             String         @id @default(cuid())
+  scheduleId     String
+  title          String
+  description    String?
+  startAt        DateTime
+  endAt          DateTime?
+  recurrenceRule String?
+  timezone       String         @default("America/Sao_Paulo")
+  status         ReminderStatus @default(ACTIVE)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  schedule       Schedule      @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  logs           ReminderLog[]
+}
+
+model ReminderLog {
+  id         String         @id @default(cuid())
+  userId     String
+  reminderId String
+  action     ReminderAction
+  note       String?
+  createdAt  DateTime       @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminder   Reminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+}
+
+model AiRequest {
+  id             String   @id @default(cuid())
+  userId         String
+  inputType      String
+  prompt         String?
+  imageUrl       String?
+  aiResponseJson String?
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now())
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

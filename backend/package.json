@@ -1,0 +1,31 @@
+{
+  "name": "rotina-ai-backend",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Backend do app Rotina AI",
+  "main": "src/server.ts",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "prisma:generate": "prisma generate"
+  },
+  "dependencies": {
+    "@fastify/cors": "latest",
+    "@fastify/jwt": "latest",
+    "@prisma/adapter-better-sqlite3": "latest",
+    "@prisma/client": "latest",
+    "bcryptjs": "latest",
+    "dotenv": "latest",
+    "fastify": "latest",
+    "prisma": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "latest",
+    "@types/node": "latest",
+    "tsx": "latest",
+    "typescript": "latest"
+  }
+}
