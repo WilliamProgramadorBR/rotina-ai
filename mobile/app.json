@@ -19,9 +19,11 @@
       "expo-dev-client"
     ],
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "SEU_PROJECT_ID_DO_EAS"
+        "projectId": "cc180b55-d92b-4ffa-b03b-742c60a91e7c"
       }
-    }
+    },
+    "owner": "williamdevbackend"
   }
 }
