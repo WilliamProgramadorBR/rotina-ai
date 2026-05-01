@@ -1,241 +1,177 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
-import { Alert, RefreshControl, StyleSheet, Text, View } from "react-native";
-import { Button } from "@/components/Button";
-import { Card } from "@/components/Card";
-import { Screen } from "@/components/Screen";
-import { LoadingState } from "@/components/LoadingState";
-import { useAuth } from "@/context/AuthContext";
-import { getApiErrorMessage } from "@/services/api";
-import { createReminderLogRequest, listTodayRemindersRequest } from "@/services/reminders";
-import { cancelReminderNotification, scheduleSnoozeNotification } from "@/services/notifications";
-import { Reminder, ReminderAction } from "@/types/api";
-import { formatTime } from "@/utils/date";
+import { api } from "../src/services/api";
+import { useAuth } from "../src/context/AuthContext";
+import { Reminder } from "../src/types/entities";
+import { colors, spacing } from "../src/theme";
+import { formatLongDate, getPeriodFromDate } from "../src/utils/date";
+import { Button, EmptyState, LoadingState, StatCard } from "../src/components/ui";
+import { PageHeader } from "../src/components/PageHeader";
+import { ScreenLayout } from "../src/components/ScreenLayout";
+import { ReminderCard } from "../src/components/ReminderCard";
+
+const periods = ["Madrugada", "Manhã", "Tarde", "Noite"];
+
+function reminderHasAction(reminder: Reminder, action: string) {
+  return reminder.logs?.some((log) => log.action === action);
+}
 
 export default function HomeScreen() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<"ALL" | "PENDING" | "DONE">("ALL");
 
-  async function loadTodayReminders() {
-    const data = await listTodayRemindersRequest();
-    setReminders(data);
-  }
-
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-
-      async function load() {
-        try {
-          setLoading(true);
-          const data = await listTodayRemindersRequest();
-
-          if (isActive) {
-            setReminders(data);
-          }
-        } catch (error) {
-          Alert.alert("Erro", getApiErrorMessage(error));
-        } finally {
-          if (isActive) {
-            setLoading(false);
-          }
-        }
-      }
-
-      load();
-
-      return () => {
-        isActive = false;
-      };
-    }, [])
-  );
-
-  async function handleRefresh() {
+  const loadTodayReminders = useCallback(async (silent = false) => {
     try {
-      setRefreshing(true);
-      await loadTodayReminders();
-    } catch (error) {
-      Alert.alert("Erro", getApiErrorMessage(error));
+      if (!silent) setIsLoading(true);
+      const response = await api.get("/reminders/today");
+      setReminders(response.data.reminders || []);
+    } catch (error: any) {
+      console.log("[HOME ERROR]", error?.response?.data || error);
+      Alert.alert("Erro", error?.response?.data?.message || "Não foi possível carregar os lembretes.");
     } finally {
-      setRefreshing(false);
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
-  }
+  }, []);
 
-  async function handleLog(reminder: Reminder, action: ReminderAction) {
+  useFocusEffect(useCallback(() => { loadTodayReminders(); }, [loadTodayReminders]));
+  useEffect(() => { loadTodayReminders(); }, [loadTodayReminders]);
+
+  const filteredReminders = useMemo(() => {
+    if (activeFilter === "DONE") return reminders.filter((reminder) => reminderHasAction(reminder, "DONE"));
+    if (activeFilter === "PENDING") {
+      return reminders.filter((reminder) => !reminderHasAction(reminder, "DONE") && !reminderHasAction(reminder, "SKIPPED"));
+    }
+    return reminders;
+  }, [activeFilter, reminders]);
+
+  const grouped = useMemo(() => {
+    return periods
+      .map((period) => ({ period, data: filteredReminders.filter((reminder) => getPeriodFromDate(reminder.startAt) === period) }))
+      .filter((group) => group.data.length > 0);
+  }, [filteredReminders]);
+
+  const doneCount = reminders.filter((reminder) => reminderHasAction(reminder, "DONE")).length;
+  const pendingCount = reminders.filter((reminder) => !reminderHasAction(reminder, "DONE") && !reminderHasAction(reminder, "SKIPPED")).length;
+
+  async function registerAction(reminderId: string, action: "DONE" | "SNOOZED" | "SKIPPED") {
     try {
-      await createReminderLogRequest(reminder.id, { action });
-
-      if (action === "SNOOZED") {
-        await scheduleSnoozeNotification(reminder, 10);
-      }
-
-      if (action === "DONE" || action === "SKIPPED") {
-        await cancelReminderNotification(reminder.id);
-      }
-
-      await loadTodayReminders();
-    } catch (error) {
-      Alert.alert("Erro", getApiErrorMessage(error));
+      await api.post(`/reminders/${reminderId}/log`, {
+        action,
+        note: action === "DONE" ? "Marcado como feito pelo app." : action === "SNOOZED" ? "Adiado pelo app." : "Pulado pelo app."
+      });
+      await loadTodayReminders(true);
+    } catch (error: any) {
+      console.log("[REMINDER ACTION ERROR]", error?.response?.data || error);
+      Alert.alert("Erro", error?.response?.data?.message || "Não foi possível atualizar o lembrete.");
     }
-  }
-
-  async function handleLogout() {
-    await logout();
-    router.replace("/login");
-  }
-
-  if (loading) {
-    return <LoadingState message="Buscando lembretes de hoje..." />;
   }
 
   return (
-    <Screen
-      scroll
-    >
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Olá, {user?.name?.split(" ")[0] || "usuário"}</Text>
-          <Text style={styles.title}>Sua rotina de hoje</Text>
+    <ScreenLayout scroll={false}>
+      {({ openMenu, isWide }) => (
+        <View style={styles.page}>
+          <PageHeader
+            title={`Olá, ${user?.name?.split(" ")[0] || "usuário"}`}
+            subtitle={formatLongDate()}
+            onMenu={isWide ? undefined : openMenu}
+            right={<Pressable style={styles.aiButton} onPress={() => router.push("/ai-prompt")}><Text style={styles.aiButtonText}>✨ IA</Text></Pressable>}
+          />
+
+          <View style={styles.hero}>
+            <Text style={styles.heroKicker}>Painel do dia</Text>
+            <Text style={styles.heroTitle}>Sua rotina em modo controle.</Text>
+            <Text style={styles.heroText}>Acompanhe seus lembretes, marque o que foi feito e crie novos cronogramas com IA.</Text>
+          </View>
+
+          <View style={styles.stats}>
+            <StatCard title="Hoje" value={reminders.length} icon="🔔" />
+            <StatCard title="Pendentes" value={pendingCount} icon="⏳" tone="orange" />
+            <StatCard title="Feitos" value={doneCount} icon="✅" tone="green" />
+          </View>
+
+          <View style={styles.quickActions}>
+            <Button title="Cronogramas" variant="secondary" onPress={() => router.push("/schedules")} style={styles.quickButton} />
+            <Button title="Criar com IA" onPress={() => router.push("/ai-prompt")} style={styles.quickButton} />
+          </View>
+
+          <View style={styles.filters}>
+            {[
+              { key: "ALL", label: "Todos" },
+              { key: "PENDING", label: "Pendentes" },
+              { key: "DONE", label: "Feitos" }
+            ].map((item) => (
+              <Pressable key={item.key} style={[styles.filter, activeFilter === item.key && styles.filterActive]} onPress={() => setActiveFilter(item.key as any)}>
+                <Text style={[styles.filterText, activeFilter === item.key && styles.filterTextActive]}>{item.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {isLoading ? (
+            <LoadingState label="Organizando seus lembretes..." />
+          ) : (
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.timeline}
+              refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => { setIsRefreshing(true); loadTodayReminders(true); }} />}
+            >
+              {grouped.length === 0 ? (
+                <EmptyState
+                  icon="🌤️"
+                  title="Nada por aqui"
+                  description="Você ainda não possui lembretes para este filtro. Crie um cronograma manual ou gere uma rotina com IA."
+                  action={<Button title="Criar com IA" onPress={() => router.push("/ai-prompt")} />}
+                />
+              ) : (
+                grouped.map((group) => (
+                  <View key={group.period} style={styles.periodBlock}>
+                    <View style={styles.periodHeader}>
+                      <Text style={styles.periodTitle}>{group.period}</Text>
+                      <Text style={styles.periodCount}>{group.data.length} {group.data.length === 1 ? "alarme" : "alarmes"}</Text>
+                    </View>
+                    {group.data.map((reminder) => (
+                      <ReminderCard
+                        key={reminder.id}
+                        reminder={reminder}
+                        onDone={() => registerAction(reminder.id, "DONE")}
+                        onSnooze={() => registerAction(reminder.id, "SNOOZED")}
+                        onSkip={() => registerAction(reminder.id, "SKIPPED")}
+                      />
+                    ))}
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          )}
         </View>
-        <Button title="Sair" variant="ghost" onPress={handleLogout} style={styles.logoutButton} />
-      </View>
-
-      <View style={styles.actions}>
-        <Button title="Cronogramas" variant="secondary" onPress={() => router.push("/schedules")} />
-        <Button title="Prompt IA" variant="secondary" onPress={() => router.push("/ai-prompt")} />
-        <Button title="Teste notificação" variant="secondary" onPress={() => router.push("/notifications-test")} />
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Lembretes de hoje</Text>
-
-        {reminders.length === 0 ? (
-          <Card>
-            <Text style={styles.emptyTitle}>Nada agendado para hoje.</Text>
-            <Text style={styles.emptyText}>Crie um cronograma e adicione seu primeiro lembrete.</Text>
-            <Button title="Criar cronograma" onPress={() => router.push("/schedules/new")} />
-          </Card>
-        ) : (
-          reminders.map((reminder) => {
-            const lastLog = reminder.logs?.[0];
-
-            return (
-              <Card key={reminder.id} style={styles.reminderCard}>
-                <View style={styles.reminderHeader}>
-                  <Text style={styles.reminderTime}>{formatTime(reminder.startAt)}</Text>
-                  <Text style={styles.category}>{reminder.schedule?.category || "OTHER"}</Text>
-                </View>
-
-                <Text style={styles.reminderTitle}>{reminder.title}</Text>
-                {!!reminder.description && <Text style={styles.reminderDescription}>{reminder.description}</Text>}
-                {!!lastLog && <Text style={styles.lastLog}>Última ação: {lastLog.action}</Text>}
-
-                <View style={styles.logActions}>
-                  <Button title="Feito" onPress={() => handleLog(reminder, "DONE")} style={styles.smallButton} />
-                  <Button title="Adiar" variant="secondary" onPress={() => handleLog(reminder, "SNOOZED")} style={styles.smallButton} />
-                  <Button title="Pular" variant="danger" onPress={() => handleLog(reminder, "SKIPPED")} style={styles.smallButton} />
-                </View>
-              </Card>
-            );
-          })
-        )}
-      </View>
-    </Screen>
+      )}
+    </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    marginTop: 16,
-    marginBottom: 24,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  greeting: {
-    color: "#22C55E",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  title: {
-    color: "#F8FAFC",
-    fontSize: 30,
-    fontWeight: "900",
-    marginTop: 4,
-  },
-  logoutButton: {
-    minHeight: 40,
-    paddingHorizontal: 8,
-  },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    marginBottom: 28,
-  },
-  section: {
-    gap: 14,
-  },
-  sectionTitle: {
-    color: "#F8FAFC",
-    fontSize: 20,
-    fontWeight: "900",
-  },
-  emptyTitle: {
-    color: "#F8FAFC",
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  emptyText: {
-    color: "#94A3B8",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  reminderCard: {
-    gap: 12,
-  },
-  reminderHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  reminderTime: {
-    color: "#22C55E",
-    fontSize: 18,
-    fontWeight: "900",
-  },
-  category: {
-    color: "#CBD5E1",
-    fontSize: 12,
-    fontWeight: "800",
-    backgroundColor: "#1E293B",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  reminderTitle: {
-    color: "#F8FAFC",
-    fontSize: 18,
-    fontWeight: "900",
-  },
-  reminderDescription: {
-    color: "#94A3B8",
-    lineHeight: 21,
-  },
-  lastLog: {
-    color: "#FBBF24",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  logActions: {
-    flexDirection: "row",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  smallButton: {
-    minHeight: 44,
-    flexGrow: 1,
-  },
+  page: { flex: 1 },
+  hero: { backgroundColor: colors.dark, borderRadius: 28, padding: spacing.xl, marginBottom: spacing.lg },
+  heroKicker: { color: "#93C5FD", fontWeight: "900", fontSize: 12, textTransform: "uppercase", letterSpacing: 1 },
+  heroTitle: { color: colors.white, fontWeight: "900", fontSize: 26, lineHeight: 32, marginTop: spacing.sm },
+  heroText: { color: "#CBD5E1", fontSize: 14, lineHeight: 21, marginTop: spacing.sm },
+  aiButton: { height: 44, minWidth: 72, borderRadius: 16, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.md },
+  aiButtonText: { color: colors.white, fontWeight: "900" },
+  stats: { flexDirection: "row", gap: spacing.md, marginBottom: spacing.lg },
+  quickActions: { flexDirection: "row", gap: spacing.md, marginBottom: spacing.lg },
+  quickButton: { flex: 1 },
+  filters: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
+  filter: { height: 40, borderRadius: 999, paddingHorizontal: spacing.lg, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  filterActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  filterText: { color: colors.textMuted, fontWeight: "900" },
+  filterTextActive: { color: colors.white },
+  timeline: { paddingBottom: spacing.xxxl },
+  periodBlock: { marginBottom: spacing.xl },
+  periodHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.sm },
+  periodTitle: { color: colors.text, fontSize: 18, fontWeight: "900" },
+  periodCount: { color: colors.textMuted, fontSize: 12, fontWeight: "800" }
 });

@@ -1,127 +1,73 @@
+import { useEffect, useState } from "react";
+import { Alert, Pressable, StyleSheet, Text } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
-import { Button } from "@/components/Button";
-import { Input } from "@/components/Input";
-import { Screen } from "@/components/Screen";
-import { getApiErrorMessage } from "@/services/api";
-import { createReminderRequest } from "@/services/reminders";
-import { scheduleReminderNotification } from "@/services/notifications";
-import { buildISOFromDateAndTime, todayDateInputValue } from "@/utils/date";
+import { api } from "../../src/services/api";
+import { colors, spacing } from "../../src/theme";
+import { toLocalInputDateTime } from "../../src/utils/date";
+import { Button, Card, Input } from "../../src/components/ui";
+import { PageHeader } from "../../src/components/PageHeader";
+import { ScreenLayout } from "../../src/components/ScreenLayout";
+import { scheduleLocalNotificationForReminder } from "../../src/services/aiNotifications";
 
 export default function NewReminderScreen() {
-  const { scheduleId } = useLocalSearchParams<{ scheduleId: string }>();
+  const params = useLocalSearchParams<{ scheduleId?: string }>();
+  const [scheduleId, setScheduleId] = useState(params.scheduleId || "");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [dateValue, setDateValue] = useState(todayDateInputValue());
-  const [timeValue, setTimeValue] = useState("08:00");
-  const [loading, setLoading] = useState(false);
+  const [dateTime, setDateTime] = useState(toLocalInputDateTime(new Date(Date.now() + 10 * 60 * 1000)));
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (params.scheduleId) setScheduleId(params.scheduleId);
+  }, [params.scheduleId]);
 
   async function handleCreate() {
     try {
-      if (!scheduleId) {
-        Alert.alert("Erro", "Cronograma não informado.");
+      if (!scheduleId || !title || !dateTime) {
+        Alert.alert("Atenção", "Informe cronograma, título e data/hora.");
         return;
       }
 
-      if (!title.trim()) {
-        Alert.alert("Atenção", "Informe um título para o lembrete.");
-        return;
-      }
-
-      setLoading(true);
-
-      const reminder = await createReminderRequest({
+      setIsSubmitting(true);
+      const response = await api.post("/reminders", {
         scheduleId,
         title: title.trim(),
         description: description.trim() || undefined,
-        startAt: buildISOFromDateAndTime(dateValue, timeValue),
-        timezone: "America/Sao_Paulo",
+        startAt: new Date(dateTime).toISOString(),
+        timezone: "America/Sao_Paulo"
       });
 
-      const notificationId = await scheduleReminderNotification(reminder);
-
-      if (!notificationId) {
-        Alert.alert(
-          "Lembrete salvo",
-          "O lembrete foi criado, mas a notificação não foi agendada. Verifique se a data está no futuro e se a permissão de notificação foi liberada."
-        );
-      }
-
-      router.replace(`/schedules/${scheduleId}`);
-    } catch (error) {
-      Alert.alert("Erro", getApiErrorMessage(error));
+      await scheduleLocalNotificationForReminder(response.data.reminder);
+      Alert.alert("Lembrete criado", "O lembrete foi salvo e a notificação local foi agendada.");
+      router.back();
+    } catch (error: any) {
+      console.log("[CREATE REMINDER ERROR]", error?.response?.data || error);
+      Alert.alert("Erro", error?.response?.data?.message || "Não foi possível criar o lembrete.");
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   }
 
   return (
-    <Screen>
-      <View style={styles.header}>
-        <Text style={styles.back} onPress={() => router.back()}>← Voltar</Text>
-        <Text style={styles.title}>Novo lembrete</Text>
-        <Text style={styles.subtitle}>Defina o que precisa ser lembrado e em qual horário.</Text>
-      </View>
+    <ScreenLayout>
+      {({ openMenu, isWide }) => (
+        <>
+          <PageHeader title="Novo lembrete" subtitle="Configure data, hora e contexto" onMenu={isWide ? undefined : openMenu} right={<Pressable onPress={() => router.back()} style={styles.backButton}><Text style={styles.backText}>Voltar</Text></Pressable>} />
 
-      <View style={styles.form}>
-        <Input label="Título" value={title} onChangeText={setTitle} placeholder="Ex: Tomar remédio" />
-        <Input
-          label="Descrição"
-          value={description}
-          onChangeText={setDescription}
-          placeholder="Ex: Tomar após alimentação"
-          multiline
-          style={styles.textarea}
-        />
-        <Input
-          label="Data"
-          value={dateValue}
-          onChangeText={setDateValue}
-          placeholder="AAAA-MM-DD"
-          autoCapitalize="none"
-        />
-        <Input
-          label="Horário"
-          value={timeValue}
-          onChangeText={setTimeValue}
-          placeholder="HH:mm"
-          autoCapitalize="none"
-        />
-
-        <Button title="Salvar lembrete" onPress={handleCreate} loading={loading} />
-      </View>
-    </Screen>
+          <Card>
+            <Input label="ID do cronograma" placeholder="ID do cronograma" value={scheduleId} onChangeText={setScheduleId} editable={!params.scheduleId} />
+            <Input label="Título" placeholder="Ex: Tomar remédio" value={title} onChangeText={setTitle} />
+            <Input label="Descrição" placeholder="Ex: Tomar após alimentação" value={description} onChangeText={setDescription} multiline />
+            <Input label="Data e hora" placeholder="YYYY-MM-DDTHH:mm" value={dateTime} onChangeText={setDateTime} />
+            <Button title="Criar lembrete" onPress={handleCreate} loading={isSubmitting} style={{ marginTop: spacing.lg }} />
+          </Card>
+        </>
+      )}
+    </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    marginTop: 16,
-    marginBottom: 24,
-  },
-  back: {
-    color: "#93C5FD",
-    marginBottom: 12,
-    fontWeight: "800",
-  },
-  title: {
-    color: "#F8FAFC",
-    fontSize: 32,
-    fontWeight: "900",
-  },
-  subtitle: {
-    marginTop: 8,
-    color: "#94A3B8",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  form: {
-    gap: 16,
-  },
-  textarea: {
-    minHeight: 96,
-    textAlignVertical: "top",
-    paddingTop: 14,
-  },
+  backButton: { height: 42, paddingHorizontal: spacing.md, borderRadius: 14, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  backText: { color: colors.text, fontWeight: "900" }
 });

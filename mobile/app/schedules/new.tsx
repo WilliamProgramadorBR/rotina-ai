@@ -1,29 +1,20 @@
-import { router } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
-import { Button } from "@/components/Button";
-import { Input } from "@/components/Input";
-import { Screen } from "@/components/Screen";
-import { getApiErrorMessage } from "@/services/api";
-import { createScheduleRequest } from "@/services/schedules";
-import { ScheduleCategory } from "@/types/api";
+import { Alert, Pressable, ScrollView, StyleSheet, Text } from "react-native";
+import { router } from "expo-router";
+import { api } from "../../src/services/api";
+import { ScheduleCategory } from "../../src/types/entities";
+import { colors, getCategoryMeta, spacing } from "../../src/theme";
+import { Button, Card, Input } from "../../src/components/ui";
+import { PageHeader } from "../../src/components/PageHeader";
+import { ScreenLayout } from "../../src/components/ScreenLayout";
 
-const CATEGORIES: { value: ScheduleCategory; label: string }[] = [
-  { value: "HEALTH", label: "Saúde" },
-  { value: "STUDY", label: "Estudo" },
-  { value: "WORKOUT", label: "Treino" },
-  { value: "WORK", label: "Trabalho" },
-  { value: "SLEEP", label: "Sono" },
-  { value: "WATER", label: "Água" },
-  { value: "PERSONAL", label: "Pessoal" },
-  { value: "OTHER", label: "Outro" },
-];
+const categories: ScheduleCategory[] = ["HEALTH", "STUDY", "WORKOUT", "WORK", "SLEEP", "WATER", "PERSONAL", "OTHER"];
 
 export default function NewScheduleScreen() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<ScheduleCategory>("OTHER");
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleCreate() {
     try {
@@ -32,125 +23,61 @@ export default function NewScheduleScreen() {
         return;
       }
 
-      setLoading(true);
-      const schedule = await createScheduleRequest({
+      setIsSubmitting(true);
+      const response = await api.post("/schedules", {
         title: title.trim(),
         description: description.trim() || undefined,
         category,
-        sourceType: "MANUAL",
+        sourceType: "MANUAL"
       });
 
-      router.replace(`/schedules/${schedule.id}`);
-    } catch (error) {
-      Alert.alert("Erro", getApiErrorMessage(error));
+      router.replace(`/schedules/${response.data.schedule.id}` as any);
+    } catch (error: any) {
+      console.log("[CREATE SCHEDULE ERROR]", error?.response?.data || error);
+      Alert.alert("Erro", error?.response?.data?.message || "Não foi possível criar o cronograma.");
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   }
 
   return (
-    <Screen>
-      <View style={styles.header}>
-        <Text style={styles.back} onPress={() => router.back()}>← Voltar</Text>
-        <Text style={styles.title}>Novo cronograma</Text>
-        <Text style={styles.subtitle}>Crie um grupo para organizar seus lembretes.</Text>
-      </View>
+    <ScreenLayout>
+      {({ openMenu, isWide }) => (
+        <>
+          <PageHeader title="Novo cronograma" subtitle="Crie uma rotina manual" onMenu={isWide ? undefined : openMenu} right={<Pressable onPress={() => router.back()} style={styles.backButton}><Text style={styles.backText}>Voltar</Text></Pressable>} />
 
-      <View style={styles.form}>
-        <Input label="Título" value={title} onChangeText={setTitle} placeholder="Ex: Tratamento médico" />
-        <Input
-          label="Descrição"
-          value={description}
-          onChangeText={setDescription}
-          placeholder="Ex: Remédios desta semana"
-          multiline
-          style={styles.textarea}
-        />
+          <Card>
+            <Input label="Título" placeholder="Ex: Tratamento médico" value={title} onChangeText={setTitle} />
+            <Input label="Descrição" placeholder="Explique o objetivo deste cronograma..." value={description} onChangeText={setDescription} multiline />
 
-        <View style={styles.categoryWrapper}>
-          <Text style={styles.label}>Categoria</Text>
-          <View style={styles.categories}>
-            {CATEGORIES.map((item) => {
-              const selected = item.value === category;
+            <Text style={styles.label}>Categoria</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>
+              {categories.map((item) => {
+                const meta = getCategoryMeta(item);
+                const active = category === item;
+                return (
+                  <Pressable key={item} onPress={() => setCategory(item)} style={[styles.category, { backgroundColor: active ? meta.color : meta.soft, borderColor: active ? meta.color : colors.border }]}>
+                    <Text style={styles.categoryIcon}>{meta.icon}</Text>
+                    <Text style={[styles.categoryText, { color: active ? colors.white : meta.color }]}>{meta.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
 
-              return (
-                <Pressable
-                  key={item.value}
-                  onPress={() => setCategory(item.value)}
-                  style={[styles.categoryItem, selected && styles.categoryItemSelected]}
-                >
-                  <Text style={[styles.categoryText, selected && styles.categoryTextSelected]}>{item.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <Button title="Salvar cronograma" onPress={handleCreate} loading={loading} />
-      </View>
-    </Screen>
+            <Button title="Criar cronograma" onPress={handleCreate} loading={isSubmitting} style={{ marginTop: spacing.lg }} />
+          </Card>
+        </>
+      )}
+    </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    marginTop: 16,
-    marginBottom: 24,
-  },
-  back: {
-    color: "#93C5FD",
-    marginBottom: 12,
-    fontWeight: "800",
-  },
-  title: {
-    color: "#F8FAFC",
-    fontSize: 32,
-    fontWeight: "900",
-  },
-  subtitle: {
-    marginTop: 8,
-    color: "#94A3B8",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  form: {
-    gap: 16,
-  },
-  textarea: {
-    minHeight: 96,
-    textAlignVertical: "top",
-    paddingTop: 14,
-  },
-  categoryWrapper: {
-    gap: 10,
-  },
-  label: {
-    color: "#CBD5E1",
-    fontWeight: "700",
-    fontSize: 14,
-  },
-  categories: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  categoryItem: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "#111827",
-    borderWidth: 1,
-    borderColor: "#334155",
-  },
-  categoryItemSelected: {
-    backgroundColor: "#22C55E",
-    borderColor: "#22C55E",
-  },
-  categoryText: {
-    color: "#CBD5E1",
-    fontWeight: "800",
-  },
-  categoryTextSelected: {
-    color: "#052E16",
-  },
+  backButton: { height: 42, paddingHorizontal: spacing.md, borderRadius: 14, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  backText: { color: colors.text, fontWeight: "900" },
+  label: { color: colors.text, fontSize: 14, fontWeight: "900", marginBottom: spacing.sm },
+  categories: { gap: spacing.sm, paddingBottom: spacing.xs },
+  category: { minHeight: 42, borderRadius: 999, borderWidth: 1, paddingHorizontal: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  categoryIcon: { fontSize: 16 },
+  categoryText: { fontWeight: "900" }
 });

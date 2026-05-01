@@ -1,191 +1,142 @@
+import { useCallback, useMemo, useState } from "react";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
-import { Button } from "@/components/Button";
-import { Card } from "@/components/Card";
-import { LoadingState } from "@/components/LoadingState";
-import { Screen } from "@/components/Screen";
-import { getApiErrorMessage } from "@/services/api";
-import { deleteScheduleRequest, getScheduleRequest } from "@/services/schedules";
-import { Schedule } from "@/types/api";
-import { formatDateTime } from "@/utils/date";
+import { api } from "../../src/services/api";
+import { Reminder, Schedule } from "../../src/types/entities";
+import { colors, getCategoryMeta, spacing } from "../../src/theme";
+import { formatTime, getPeriodFromDate } from "../../src/utils/date";
+import { Button, EmptyState, LoadingState, StatCard } from "../../src/components/ui";
+import { PageHeader } from "../../src/components/PageHeader";
+import { ScreenLayout } from "../../src/components/ScreenLayout";
 
 export default function ScheduleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [schedule, setSchedule] = useState<Schedule | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [deleting, setDeleting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-
-      async function load() {
-        try {
-          if (!id) {
-            return;
-          }
-
-          setLoading(true);
-          const data = await getScheduleRequest(id);
-
-          if (isActive) {
-            setSchedule(data);
-          }
-        } catch (error) {
-          Alert.alert("Erro", getApiErrorMessage(error));
-        } finally {
-          if (isActive) {
-            setLoading(false);
-          }
-        }
-      }
-
-      load();
-
-      return () => {
-        isActive = false;
-      };
-    }, [id])
-  );
-
-  async function handleDelete() {
-    if (!id) {
-      return;
+  const loadSchedule = useCallback(async () => {
+    if (!id) return;
+    try {
+      setIsLoading(true);
+      const response = await api.get(`/schedules/${id}`);
+      setSchedule(response.data.schedule);
+    } catch (error: any) {
+      console.log("[SCHEDULE DETAIL ERROR]", error?.response?.data || error);
+      Alert.alert("Erro", error?.response?.data?.message || "Não foi possível carregar o cronograma.");
+    } finally {
+      setIsLoading(false);
     }
+  }, [id]);
 
-    Alert.alert("Remover cronograma", "Tem certeza que deseja remover este cronograma e seus lembretes?", [
+  useFocusEffect(useCallback(() => { loadSchedule(); }, [loadSchedule]));
+
+  const reminders = useMemo(() => schedule?.reminders || [], [schedule]);
+  const meta = getCategoryMeta(schedule?.category);
+
+  const grouped = useMemo(() => {
+    const periods = ["Madrugada", "Manhã", "Tarde", "Noite"];
+    return periods
+      .map((period) => ({ period, data: reminders.filter((reminder) => getPeriodFromDate(reminder.startAt) === period) }))
+      .filter((group) => group.data.length > 0);
+  }, [reminders]);
+
+  async function deleteSchedule() {
+    if (!schedule) return;
+
+    Alert.alert("Remover cronograma", "Essa ação remove o cronograma e seus lembretes. Deseja continuar?", [
       { text: "Cancelar", style: "cancel" },
       {
         text: "Remover",
         style: "destructive",
         onPress: async () => {
           try {
-            setDeleting(true);
-            await deleteScheduleRequest(id);
+            await api.delete(`/schedules/${schedule.id}`);
             router.replace("/schedules");
-          } catch (error) {
-            Alert.alert("Erro", getApiErrorMessage(error));
-          } finally {
-            setDeleting(false);
+          } catch (error: any) {
+            Alert.alert("Erro", error?.response?.data?.message || "Não foi possível remover.");
           }
-        },
-      },
+        }
+      }
     ]);
   }
 
-  if (loading) {
-    return <LoadingState message="Carregando cronograma..." />;
-  }
-
-  if (!schedule) {
-    return (
-      <Screen>
-        <Text style={styles.title}>Cronograma não encontrado.</Text>
-        <Button title="Voltar" onPress={() => router.back()} />
-      </Screen>
-    );
-  }
-
   return (
-    <Screen>
-      <View style={styles.header}>
-        <Text style={styles.back} onPress={() => router.back()}>← Voltar</Text>
-        <Text style={styles.category}>{schedule.category}</Text>
-        <Text style={styles.title}>{schedule.title}</Text>
-        {!!schedule.description && <Text style={styles.subtitle}>{schedule.description}</Text>}
-      </View>
+    <ScreenLayout>
+      {({ openMenu, isWide }) => (
+        <>
+          <PageHeader title="Detalhes" subtitle="Cronograma e lembretes" onMenu={isWide ? undefined : openMenu} right={<Pressable onPress={() => router.back()} style={styles.backButton}><Text style={styles.backText}>Voltar</Text></Pressable>} />
 
-      <View style={styles.actions}>
-        <Button title="Novo lembrete" onPress={() => router.push(`/reminders/new?scheduleId=${schedule.id}`)} />
-        <Button title="Remover" variant="danger" onPress={handleDelete} loading={deleting} />
-      </View>
+          {isLoading ? (
+            <LoadingState label="Carregando cronograma..." />
+          ) : !schedule ? (
+            <EmptyState icon="📋" title="Cronograma não encontrado" description="Não foi possível localizar este cronograma." />
+          ) : (
+            <>
+              <View style={styles.hero}>
+                <View style={[styles.iconBox, { backgroundColor: meta.soft }]}><Text style={styles.icon}>{meta.icon}</Text></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.title}>{schedule.title}</Text>
+                  <Text style={styles.category}>{meta.label}</Text>
+                  {schedule.description ? <Text style={styles.description}>{schedule.description}</Text> : null}
+                </View>
+              </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Lembretes</Text>
+              <View style={styles.stats}>
+                <StatCard title="Lembretes" value={reminders.length} icon="🔔" />
+                <StatCard title="Categoria" value={meta.label} icon={meta.icon} tone="purple" />
+              </View>
 
-        {schedule.reminders?.length ? (
-          schedule.reminders.map((reminder) => (
-            <Card key={reminder.id}>
-              <Text style={styles.reminderDate}>{formatDateTime(reminder.startAt)}</Text>
-              <Text style={styles.reminderTitle}>{reminder.title}</Text>
-              {!!reminder.description && <Text style={styles.reminderDescription}>{reminder.description}</Text>}
-              <Text style={styles.reminderStatus}>Status: {reminder.status}</Text>
-            </Card>
-          ))
-        ) : (
-          <Card>
-            <Text style={styles.emptyTitle}>Nenhum lembrete neste cronograma.</Text>
-            <Text style={styles.emptyText}>Adicione o primeiro horário para começar.</Text>
-          </Card>
-        )}
-      </View>
-    </Screen>
+              <View style={styles.actionRow}>
+                <Button title="Novo lembrete" onPress={() => router.push({ pathname: "/reminders/new", params: { scheduleId: schedule.id } })} style={{ flex: 1 }} />
+                <Button title="Remover" variant="danger" onPress={deleteSchedule} style={{ flex: 1 }} />
+              </View>
+
+              <Text style={styles.sectionTitle}>Lembretes do cronograma</Text>
+
+              {grouped.length === 0 ? (
+                <EmptyState icon="🔔" title="Sem lembretes" description="Adicione o primeiro lembrete para ativar este cronograma." action={<Button title="Adicionar lembrete" onPress={() => router.push({ pathname: "/reminders/new", params: { scheduleId: schedule.id } })} />} />
+              ) : (
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  {grouped.map((group) => (
+                    <View key={group.period} style={styles.period}>
+                      <Text style={styles.periodTitle}>{group.period}</Text>
+                      {group.data.map((reminder: Reminder) => (
+                        <View key={reminder.id} style={styles.reminderRow}>
+                          <Text style={styles.reminderTime}>{formatTime(reminder.startAt)}</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.reminderTitle}>{reminder.title}</Text>
+                            {reminder.description ? <Text style={styles.reminderDescription} numberOfLines={2}>{reminder.description}</Text> : null}
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+            </>
+          )}
+        </>
+      )}
+    </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    marginTop: 16,
-    marginBottom: 22,
-  },
-  back: {
-    color: "#93C5FD",
-    marginBottom: 12,
-    fontWeight: "800",
-  },
-  category: {
-    color: "#22C55E",
-    fontSize: 13,
-    fontWeight: "900",
-    marginBottom: 8,
-  },
-  title: {
-    color: "#F8FAFC",
-    fontSize: 32,
-    fontWeight: "900",
-  },
-  subtitle: {
-    color: "#94A3B8",
-    marginTop: 8,
-    lineHeight: 22,
-  },
-  actions: {
-    gap: 10,
-    marginBottom: 24,
-  },
-  section: {
-    gap: 12,
-  },
-  sectionTitle: {
-    color: "#F8FAFC",
-    fontSize: 20,
-    fontWeight: "900",
-  },
-  reminderDate: {
-    color: "#22C55E",
-    fontWeight: "900",
-  },
-  reminderTitle: {
-    color: "#F8FAFC",
-    fontSize: 18,
-    fontWeight: "900",
-  },
-  reminderDescription: {
-    color: "#94A3B8",
-    lineHeight: 21,
-  },
-  reminderStatus: {
-    color: "#CBD5E1",
-    fontWeight: "800",
-  },
-  emptyTitle: {
-    color: "#F8FAFC",
-    fontSize: 18,
-    fontWeight: "900",
-  },
-  emptyText: {
-    color: "#94A3B8",
-    lineHeight: 22,
-  },
+  backButton: { height: 42, paddingHorizontal: spacing.md, borderRadius: 14, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  backText: { color: colors.text, fontWeight: "900" },
+  hero: { backgroundColor: colors.white, borderRadius: 28, padding: spacing.xl, flexDirection: "row", gap: spacing.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg },
+  iconBox: { width: 62, height: 62, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  icon: { fontSize: 30 },
+  title: { color: colors.text, fontSize: 24, lineHeight: 30, fontWeight: "900" },
+  category: { color: colors.textMuted, fontWeight: "900", marginTop: spacing.xs },
+  description: { color: colors.textMuted, lineHeight: 21, marginTop: spacing.sm },
+  stats: { flexDirection: "row", gap: spacing.md, marginBottom: spacing.lg },
+  actionRow: { flexDirection: "row", gap: spacing.md, marginBottom: spacing.xl },
+  sectionTitle: { color: colors.text, fontSize: 19, fontWeight: "900", marginBottom: spacing.md },
+  period: { marginBottom: spacing.xl },
+  periodTitle: { color: colors.textMuted, fontWeight: "900", marginBottom: spacing.sm },
+  reminderRow: { backgroundColor: colors.white, borderRadius: 18, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, flexDirection: "row", gap: spacing.md, alignItems: "flex-start", marginBottom: spacing.sm },
+  reminderTime: { color: colors.white, backgroundColor: colors.dark, borderRadius: 999, overflow: "hidden", paddingHorizontal: spacing.md, paddingVertical: spacing.xs, fontWeight: "900" },
+  reminderTitle: { color: colors.text, fontWeight: "900", fontSize: 16 },
+  reminderDescription: { color: colors.textMuted, marginTop: spacing.xs, lineHeight: 20 }
 });
