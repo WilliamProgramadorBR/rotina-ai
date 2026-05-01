@@ -8,6 +8,7 @@ import { Button, Card, EmptyState, StatCard } from "../src/components/ui";
 import { PageHeader } from "../src/components/PageHeader";
 import { ScreenLayout } from "../src/components/ScreenLayout";
 import { scheduleLocalNotificationsForReminders } from "../src/services/aiNotifications";
+import { scheduleReminderAlarm } from "@/services/alarmNotifications";
 
 export default function AiReviewScreen() {
   const { suggestion: suggestionParam } = useLocalSearchParams<{ suggestion?: string }>();
@@ -27,7 +28,21 @@ export default function AiReviewScreen() {
 
     try {
       setIsSubmitting(true);
-      const response = await api.post("/ai/schedules/confirm", { suggestion });
+      const response = await api.post("/ai/schedules/confirm", {
+  suggestion
+});
+
+const createdSchedule = response.data.schedule;
+
+for (const reminder of createdSchedule.reminders || []) {
+  await scheduleReminderAlarm({
+    reminderId: reminder.id,
+    title: reminder.title,
+    description: reminder.description,
+    startAt: reminder.startAt,
+    scheduleTitle: createdSchedule.title
+  });
+}
       const reminders = response.data.reminders || response.data.schedule?.reminders || [];
       await scheduleLocalNotificationsForReminders(reminders);
       Alert.alert("Cronograma criado", "Os lembretes foram criados e as notificações foram agendadas.");

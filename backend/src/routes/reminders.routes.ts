@@ -6,6 +6,49 @@ import { prisma } from "../lib/prisma";
 export async function remindersRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
 
+
+
+  app.get("/range", async (request, reply) => {
+  const querySchema = z.object({
+    start: z.string().min(10),
+    end: z.string().min(10)
+  });
+
+  const userId = request.user.sub;
+  const { start, end } = querySchema.parse(request.query);
+
+  const startDate = new Date(`${start}T00:00:00`);
+  const endDate = new Date(`${end}T23:59:59`);
+
+  const reminders = await prisma.reminder.findMany({
+    where: {
+      schedule: {
+        userId
+      },
+      startAt: {
+        gte: startDate,
+        lte: endDate
+      }
+    },
+    include: {
+      schedule: true,
+      logs: {
+        orderBy: {
+          createdAt: "desc"
+        }
+      }
+    },
+    orderBy: {
+      startAt: "asc"
+    }
+  });
+
+  return {
+    reminders
+  };
+});
+
+
   app.get("/today", async (request) => {
     const userId = request.user.sub;
 
@@ -185,3 +228,4 @@ export async function remindersRoutes(app: FastifyInstance) {
     };
   });
 }
+

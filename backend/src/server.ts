@@ -6,7 +6,7 @@ import jwt from "@fastify/jwt";
 import { authRoutes } from "./routes/auth.routes";
 import { schedulesRoutes } from "./routes/schedules.routes";
 import { remindersRoutes } from "./routes/reminders.routes";
-import { aiRoutes } from "./routes/ia.routes";
+import { iaRoutes } from "./routes/ia.routes";
 const app = Fastify({
   logger: true
 });
@@ -20,7 +20,7 @@ app.register(cors, {
 app.register(jwt, {
   secret: process.env.JWT_SECRET || "dev-secret"
 });
-app.register(aiRoutes, {
+app.register(iaRoutes, {
   prefix: "/ai"
 });
 app.decorate("authenticate", async function (request: any, reply: any) {

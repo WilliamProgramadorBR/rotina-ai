@@ -95,9 +95,29 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.quickActions}>
-            <Button title="Cronogramas" variant="secondary" onPress={() => router.push("/schedules")} style={styles.quickButton} />
-            <Button title="Criar com IA" onPress={() => router.push("/ai-prompt")} style={styles.quickButton} />
-          </View>
+        <Button
+          title="Cronogramas"
+          variant="secondary"
+          onPress={() => router.push("/schedules")}
+          style={styles.quickButton}
+        />
+
+        <Button
+          title="Calendário"
+          variant="secondary"
+          onPress={() => router.push("/calendar")}
+          style={styles.quickButton}
+        />
+      </View>
+
+      <View style={styles.quickActions}>
+        <Button
+          title="Criar com IA"
+          onPress={() => router.push("/ai-prompt")}
+          style={styles.quickButtonFull}
+        />
+      </View>
+                
 
           <View style={styles.filters}>
             {[
@@ -108,6 +128,7 @@ export default function HomeScreen() {
               <Pressable key={item.key} style={[styles.filter, activeFilter === item.key && styles.filterActive]} onPress={() => setActiveFilter(item.key as any)}>
                 <Text style={[styles.filterText, activeFilter === item.key && styles.filterTextActive]}>{item.label}</Text>
               </Pressable>
+              
             ))}
           </View>
 
@@ -162,8 +183,20 @@ const styles = StyleSheet.create({
   aiButton: { height: 44, minWidth: 72, borderRadius: 16, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.md },
   aiButtonText: { color: colors.white, fontWeight: "900" },
   stats: { flexDirection: "row", gap: spacing.md, marginBottom: spacing.lg },
-  quickActions: { flexDirection: "row", gap: spacing.md, marginBottom: spacing.lg },
-  quickButton: { flex: 1 },
+  quickActions: {
+  flexDirection: "row",
+  gap: spacing.md,
+  marginBottom: spacing.md
+},
+
+quickButton: {
+  flex: 1
+},
+
+quickButtonFull: {
+  flex: 1,
+  marginBottom: spacing.lg
+},
   filters: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
   filter: { height: 40, borderRadius: 999, paddingHorizontal: spacing.lg, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   filterActive: { backgroundColor: colors.primary, borderColor: colors.primary },

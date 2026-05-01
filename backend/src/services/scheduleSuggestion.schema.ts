@@ -1,16 +1,17 @@
 import { z } from "zod";
 
 export const reminderSuggestionSchema = z.object({
-  title: z.string().min(2),
+  title: z.string().min(1, "Título do lembrete é obrigatório."),
   description: z.string().optional().nullable(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date deve estar em YYYY-MM-DD"),
-  time: z.string().regex(/^\d{2}:\d{2}$/, "time deve estar em HH:mm"),
+  date: z.string().min(10, "Data deve estar no formato YYYY-MM-DD."),
+  time: z.string().min(5, "Hora deve estar no formato HH:mm."),
   timezone: z.string().default("America/Sao_Paulo")
 });
 
 export const scheduleSuggestionSchema = z.object({
-  title: z.string().min(2),
+  title: z.string().min(1, "Título do cronograma é obrigatório."),
   description: z.string().optional().nullable(),
+
   category: z.enum([
     "HEALTH",
     "STUDY",
@@ -21,15 +22,24 @@ export const scheduleSuggestionSchema = z.object({
     "PERSONAL",
     "OTHER"
   ]),
-  sourceType: z.literal("AI_PROMPT").default("AI_PROMPT"),
-  confidence: z.number().min(0).max(1).default(0.5),
+
+  sourceType: z.enum([
+    "AI_PROMPT"
+  ]).default("AI_PROMPT"),
+
+  confidence: z.number().min(0).max(1).default(0.7),
+
   warnings: z.array(z.string()).default([]),
-  reminders: z.array(reminderSuggestionSchema).min(1).max(60)
+
+  reminders: z
+    .array(reminderSuggestionSchema)
+    .min(1, "A IA precisa gerar pelo menos um lembrete.")
+    .max(24, "A IA pode gerar no máximo 24 lembretes por vez.")
 });
 
 export const aiSuggestRequestSchema = z.object({
-  prompt: z.string().min(5, "Descreva melhor o cronograma que deseja criar."),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  prompt: z.string().min(5, "Prompt muito curto."),
+  startDate: z.string().min(10, "Data inicial obrigatória."),
   timezone: z.string().default("America/Sao_Paulo")
 });
 
@@ -37,5 +47,7 @@ export const aiConfirmRequestSchema = z.object({
   suggestion: scheduleSuggestionSchema
 });
 
-export type ScheduleSuggestion = z.infer<typeof scheduleSuggestionSchema>;
 export type ReminderSuggestion = z.infer<typeof reminderSuggestionSchema>;
+export type ScheduleSuggestion = z.infer<typeof scheduleSuggestionSchema>;
+export type AiSuggestRequest = z.infer<typeof aiSuggestRequestSchema>;
+export type AiConfirmRequest = z.infer<typeof aiConfirmRequestSchema>;

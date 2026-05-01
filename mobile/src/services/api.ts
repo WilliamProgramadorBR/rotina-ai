@@ -6,7 +6,7 @@ export const TOKEN_KEY = "rotina-ai-token";
 
 const API_URL =
   process.env.EXPO_PUBLIC_API_URL ||
-  (Platform.OS === "web" ? "http://localhost:3333" : "https://republican-therapy-donation-rachel.trycloudflare.com");
+  (Platform.OS === "web" ? "http://localhost:3333" : "https://santa-from-deputy-sky.trycloudflare.com");
 
 function canUseLocalStorage() {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";

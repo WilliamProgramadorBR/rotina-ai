@@ -2,7 +2,6 @@ import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 
-
 export async function schedulesRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
 
@@ -34,23 +33,26 @@ export async function schedulesRoutes(app: FastifyInstance) {
     const bodySchema = z.object({
       title: z.string().min(2),
       description: z.string().optional(),
-      category: z.enum([
-  "HEALTH",
-  "STUDY",
-  "WORKOUT",
-  "WORK",
-  "SLEEP",
-  "WATER",
-  "PERSONAL",
-  "OTHER"
-]).optional(),
-
-sourceType: z.enum([
-  "MANUAL",
-  "AI_PROMPT",
-  "MEDICAL_IMAGE",
-  "IMPORTED_TEXT"
-]).optional()
+      category: z
+        .enum([
+          "HEALTH",
+          "STUDY",
+          "WORKOUT",
+          "WORK",
+          "SLEEP",
+          "WATER",
+          "PERSONAL",
+          "OTHER"
+        ])
+        .optional(),
+      sourceType: z
+        .enum([
+          "MANUAL",
+          "AI_PROMPT",
+          "MEDICAL_IMAGE",
+          "IMPORTED_TEXT"
+        ])
+        .optional()
     });
 
     const userId = request.user.sub;
@@ -63,6 +65,13 @@ sourceType: z.enum([
         description: data.description,
         category: data.category || "OTHER",
         sourceType: data.sourceType || "MANUAL"
+      },
+      include: {
+        reminders: {
+          orderBy: {
+            startAt: "asc"
+          }
+        }
       }
     });
 
