@@ -51,3 +51,12 @@ Thumbs.db
 # TypeScript / cache
 *.tsbuildinfo
 .cache/
+.expo/
+# Expo / React Native
+.expo/
+mobile/.expo/
+.expo-shared/
+dist/
+web-build/
+android/
+ios/
