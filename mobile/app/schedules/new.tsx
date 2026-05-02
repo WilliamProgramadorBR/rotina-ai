@@ -1,11 +1,22 @@
 import { useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { 
+  Alert, 
+  KeyboardAvoidingView,
+  Platform,
+  Pressable, 
+  ScrollView, 
+  StyleSheet, 
+  Text, 
+  View,
+  useWindowDimensions
+} from "react-native";
 import { router } from "expo-router";
 import { api } from "../../src/services/api";
-import { colors, fonts, getCategoryMeta, radius, shadow, spacing } from "../../src/theme";
+import { colors, fonts, getCategoryMeta, radius, spacing } from "../../src/theme";
 import { Button, Card, Input, SectionTitle } from "../../src/components/ui";
 import { PageHeader } from "../../src/components/PageHeader";
 import { ScreenLayout } from "../../src/components/ScreenLayout";
+import { useResponsive } from "../../src/hooks/useResponsive";
 
 type Category = "HEALTH" | "STUDY" | "WORKOUT" | "WORK" | "SLEEP" | "WATER" | "PERSONAL" | "OTHER";
 type Priority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
@@ -14,6 +25,87 @@ const categories: Category[] = ["HEALTH", "STUDY", "WORKOUT", "WORK", "SLEEP", "
 
 function parseLinks(value: string) {
   return value.split("\n").map((item) => item.trim()).filter(Boolean);
+}
+
+// Componente de preview colapsavel para mobile
+function PreviewSection({ 
+  expanded, 
+  onToggle, 
+  categoryMeta, 
+  title, 
+  description, 
+  alarmsEnabled, 
+  reminderBeforeMinutes, 
+  priority 
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+  categoryMeta: ReturnType<typeof getCategoryMeta>;
+  title: string;
+  description: string;
+  alarmsEnabled: boolean;
+  reminderBeforeMinutes: string;
+  priority: Priority;
+}) {
+  return (
+    <Card style={styles.previewCard}>
+      <Pressable 
+        style={styles.previewHeader} 
+        onPress={onToggle}
+        accessible
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+      >
+        <View style={styles.previewHeaderLeft}>
+          <View style={[styles.previewIcon, { backgroundColor: categoryMeta.background }]}>
+            <Text style={[styles.previewIconText, { color: categoryMeta.color }]}>
+              {categoryMeta.icon}
+            </Text>
+          </View>
+          <View style={styles.previewHeaderInfo}>
+            <Text style={styles.previewTitle} numberOfLines={1}>
+              {title || "Seu novo cronograma"}
+            </Text>
+            <Text style={styles.previewSubtitle}>
+              Toque para {expanded ? "recolher" : "expandir"}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.expandIcon}>{expanded ? "▲" : "▼"}</Text>
+      </Pressable>
+
+      {expanded && (
+        <View style={styles.previewContent}>
+          <Text style={styles.previewDescription} numberOfLines={3}>
+            {description || "Rotina com contexto, lembretes e organização inteligente."}
+          </Text>
+          
+          <View style={styles.previewDivider} />
+          
+          <View style={styles.previewRows}>
+            <View style={styles.previewRow}>
+              <Text style={styles.previewLabel}>Categoria</Text>
+              <Text style={styles.previewValue}>{categoryMeta.label}</Text>
+            </View>
+            <View style={styles.previewRow}>
+              <Text style={styles.previewLabel}>Alarmes</Text>
+              <Text style={styles.previewValue}>{alarmsEnabled ? "Ativados" : "Desativados"}</Text>
+            </View>
+            <View style={styles.previewRow}>
+              <Text style={styles.previewLabel}>Lembrete antes</Text>
+              <Text style={styles.previewValue}>{reminderBeforeMinutes} min</Text>
+            </View>
+            <View style={styles.previewRow}>
+              <Text style={styles.previewLabel}>Prioridade</Text>
+              <Text style={styles.previewValue}>
+                {priority === "NORMAL" ? "Normal" : priority === "HIGH" ? "Alta" : priority === "CRITICAL" ? "Crítica" : "Baixa"}
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
+    </Card>
+  );
 }
 
 export default function NewScheduleScreen() {
@@ -27,8 +119,14 @@ export default function NewScheduleScreen() {
   const [reminderBeforeMinutes, setReminderBeforeMinutes] = useState("10");
   const [priority, setPriority] = useState<Priority>("NORMAL");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [previewExpanded, setPreviewExpanded] = useState(false);
 
   const categoryMeta = useMemo(() => getCategoryMeta(category), [category]);
+  const { width } = useWindowDimensions();
+  const { isPhone, isSmallPhone, isTablet, isDesktop } = useResponsive();
+  
+  // Layout em coluna unica para mobile (< 768px)
+  const isMobileLayout = width < 768;
 
   async function handleCreate() {
     try {
@@ -59,127 +157,592 @@ export default function NewScheduleScreen() {
     }
   }
 
+  function handleClear() {
+    setTitle("");
+    setDescription("");
+    setNotes("");
+    setLinksText("");
+    setExtraInfo("");
+  }
+
   return (
     <ScreenLayout>
       {({ openMenu, isWide }) => (
-        <View>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.keyboardView}
+        >
           <PageHeader
             title="Novo cronograma"
-            subtitle="Monte uma rotina manual com contexto e automação"
+            subtitle="Monte uma rotina manual com contexto"
             onMenu={isWide ? undefined : openMenu}
-            right={<Pressable style={styles.backButton} onPress={() => router.back()}><Text style={styles.backText}>Voltar</Text></Pressable>}
+            right={
+              <Pressable 
+                style={styles.backButton} 
+                onPress={() => router.back()}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.backText}>Voltar</Text>
+              </Pressable>
+            }
           />
 
-          <View style={styles.grid}>
-            <View style={styles.formColumn}>
+          {/* Preview colapsavel no mobile - aparece no topo */}
+          {isMobileLayout && (
+            <PreviewSection
+              expanded={previewExpanded}
+              onToggle={() => setPreviewExpanded(!previewExpanded)}
+              categoryMeta={categoryMeta}
+              title={title}
+              description={description}
+              alarmsEnabled={alarmsEnabled}
+              reminderBeforeMinutes={reminderBeforeMinutes}
+              priority={priority}
+            />
+          )}
+
+          <View style={[styles.grid, isMobileLayout && styles.gridMobile]}>
+            {/* Coluna do formulario */}
+            <View style={[styles.formColumn, isMobileLayout && styles.formColumnMobile]}>
+              
+              {/* Secao 1 - Informacoes basicas */}
               <Card style={styles.sectionCard}>
-                <SectionTitle title="1. Informações básicas" subtitle="Quanto mais contexto, melhor será a organização da sua rotina." />
-                <Input label="Título" placeholder="Ex: Estudar para o ENEM" value={title} onChangeText={setTitle} hint={`${title.length}/80`} />
-                <Input label="Descrição" placeholder="Em poucas palavras, qual o objetivo deste cronograma?" value={description} onChangeText={setDescription} multiline hint={`${description.length}/120`} />
-                <Input label="Observações" placeholder="Detalhes importantes, contexto ou instruções específicas." value={notes} onChangeText={setNotes} multiline hint={`${notes.length}/300`} />
-                <Input label="Links úteis" placeholder={"Cole links relevantes, um por linha\nhttps://exemplo.com"} value={linksText} onChangeText={setLinksText} multiline autoCapitalize="none" hint="Artigos, docs, vídeos, receitas ou materiais de referência." />
-                <Input label="Informações extras" placeholder="Qualquer outra informação que a IA deve considerar ao gerar sua rotina." value={extraInfo} onChangeText={setExtraInfo} multiline hint={`${extraInfo.length}/400`} />
+                <SectionTitle 
+                  title="1. Informações básicas" 
+                  subtitle="Quanto mais contexto, melhor a organização." 
+                />
+                
+                <Input 
+                  label="Título" 
+                  placeholder="Ex: Estudar para o ENEM" 
+                  value={title} 
+                  onChangeText={setTitle} 
+                  hint={`${title.length}/80`}
+                  maxLength={80}
+                />
+                
+                <Input 
+                  label="Descrição" 
+                  placeholder="Qual o objetivo deste cronograma?" 
+                  value={description} 
+                  onChangeText={setDescription} 
+                  multiline 
+                  hint={`${description.length}/120`}
+                  maxLength={120}
+                  numberOfLines={3}
+                />
+                
+                <Input 
+                  label="Observações" 
+                  placeholder="Detalhes importantes ou instruções específicas." 
+                  value={notes} 
+                  onChangeText={setNotes} 
+                  multiline 
+                  hint={`${notes.length}/300`}
+                  maxLength={300}
+                  numberOfLines={4}
+                />
+                
+                <Input 
+                  label="Links úteis" 
+                  placeholder={"Cole links relevantes, um por linha"} 
+                  value={linksText} 
+                  onChangeText={setLinksText} 
+                  multiline 
+                  autoCapitalize="none" 
+                  hint="Artigos, docs, vídeos ou materiais de referência."
+                  numberOfLines={3}
+                />
+                
+                <Input 
+                  label="Informações extras" 
+                  placeholder="Outras informações que a IA deve considerar." 
+                  value={extraInfo} 
+                  onChangeText={setExtraInfo} 
+                  multiline 
+                  hint={`${extraInfo.length}/400`}
+                  maxLength={400}
+                  numberOfLines={3}
+                />
               </Card>
 
+              {/* Secao 2 - Categoria */}
               <Card style={styles.sectionCard}>
-                <SectionTitle title="2. Categoria" subtitle="Escolha a categoria que melhor representa este cronograma." />
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+                <SectionTitle 
+                  title="2. Categoria" 
+                  subtitle="Escolha a que melhor representa este cronograma." 
+                />
+                
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false} 
+                  contentContainerStyle={styles.categoryRow}
+                >
                   {categories.map((item) => {
                     const meta = getCategoryMeta(item);
                     const active = category === item;
                     return (
-                      <Pressable key={item} onPress={() => setCategory(item)} style={[styles.categoryPill, active && { borderColor: meta.color, backgroundColor: meta.background }]}>
-                        <Text style={[styles.categoryText, active && { color: meta.color }]}>{meta.icon} {meta.label}</Text>
+                      <Pressable 
+                        key={item} 
+                        onPress={() => setCategory(item)} 
+                        style={[
+                          styles.categoryPill, 
+                          active && { borderColor: meta.color, backgroundColor: meta.background }
+                        ]}
+                      >
+                        <Text 
+                          style={[styles.categoryText, active && { color: meta.color }]}
+                          numberOfLines={1}
+                        >
+                          {meta.icon} {meta.label}
+                        </Text>
                       </Pressable>
                     );
                   })}
                 </ScrollView>
               </Card>
 
+              {/* Secao 3 - Notificacoes e prioridade */}
               <Card style={styles.sectionCard}>
-                <SectionTitle title="3. Notificações e prioridade" subtitle="Configure como essa rotina deve se comportar no app." />
-                <View style={styles.settingGrid}>
-                  <Pressable style={styles.settingBox} onPress={() => setAlarmsEnabled((current) => !current)}>
-                    <Text style={styles.settingTitle}>◔ Ativar alarmes</Text>
-                    <Text style={styles.settingText}>{alarmsEnabled ? "Ativado" : "Desativado"}</Text>
+                <SectionTitle 
+                  title="3. Notificações e prioridade" 
+                  subtitle="Configure o comportamento no app." 
+                />
+                
+                <View style={[styles.settingGrid, isMobileLayout && styles.settingGridMobile]}>
+                  <Pressable 
+                    style={[styles.settingBox, isMobileLayout && styles.settingBoxMobile]} 
+                    onPress={() => setAlarmsEnabled((current) => !current)}
+                  >
+                    <Text style={styles.settingIcon}>◔</Text>
+                    <View style={styles.settingInfo}>
+                      <Text style={styles.settingTitle}>Ativar alarmes</Text>
+                      <Text style={styles.settingText}>{alarmsEnabled ? "Ativado" : "Desativado"}</Text>
+                    </View>
                   </Pressable>
-                  <Pressable style={styles.settingBox} onPress={() => setReminderBeforeMinutes((current) => current === "10" ? "30" : "10")}>
-                    <Text style={styles.settingTitle}>◷ Lembrete antes</Text>
-                    <Text style={styles.settingText}>{reminderBeforeMinutes} minutos</Text>
+                  
+                  <Pressable 
+                    style={[styles.settingBox, isMobileLayout && styles.settingBoxMobile]} 
+                    onPress={() => setReminderBeforeMinutes((current) => current === "10" ? "30" : "10")}
+                  >
+                    <Text style={styles.settingIcon}>◷</Text>
+                    <View style={styles.settingInfo}>
+                      <Text style={styles.settingTitle}>Lembrete antes</Text>
+                      <Text style={styles.settingText}>{reminderBeforeMinutes} minutos</Text>
+                    </View>
                   </Pressable>
-                  <Pressable style={styles.settingBox} onPress={() => setPriority((current) => current === "NORMAL" ? "HIGH" : current === "HIGH" ? "CRITICAL" : "NORMAL")}>
-                    <Text style={styles.settingTitle}>⚑ Prioridade</Text>
-                    <Text style={styles.settingText}>{priority === "NORMAL" ? "Normal" : priority === "HIGH" ? "Alta" : "Crítica"}</Text>
+                  
+                  <Pressable 
+                    style={[styles.settingBox, isMobileLayout && styles.settingBoxMobile]} 
+                    onPress={() => setPriority((current) => current === "NORMAL" ? "HIGH" : current === "HIGH" ? "CRITICAL" : "NORMAL")}
+                  >
+                    <Text style={styles.settingIcon}>⚑</Text>
+                    <View style={styles.settingInfo}>
+                      <Text style={styles.settingTitle}>Prioridade</Text>
+                      <Text style={styles.settingText}>
+                        {priority === "NORMAL" ? "Normal" : priority === "HIGH" ? "Alta" : "Crítica"}
+                      </Text>
+                    </View>
                   </Pressable>
                 </View>
               </Card>
 
-              <View style={styles.footerActions}>
-                <Button title="Limpar" variant="secondary" onPress={() => { setTitle(""); setDescription(""); setNotes(""); setLinksText(""); setExtraInfo(""); }} style={styles.footerButton} />
-                <Button title="Salvar cronograma" onPress={handleCreate} loading={isSubmitting} style={styles.footerButton} />
+              {/* Botoes de acao */}
+              <View style={[styles.footerActions, isMobileLayout && styles.footerActionsMobile]}>
+                <Button 
+                  title="Limpar" 
+                  variant="secondary" 
+                  onPress={handleClear} 
+                  style={[styles.footerButton, isMobileLayout && styles.footerButtonMobile]} 
+                />
+                <Button 
+                  title="Salvar cronograma" 
+                  onPress={handleCreate} 
+                  loading={isSubmitting} 
+                  style={[styles.footerButton, styles.footerButtonPrimary, isMobileLayout && styles.footerButtonMobile]} 
+                />
               </View>
             </View>
 
-            <View style={styles.previewColumn}>
-              <Card style={styles.previewCard}>
-                <SectionTitle title="Preview do cronograma" subtitle="Veja como sua rotina será organizada." />
-                <View style={styles.previewHeader}>
-                  <View style={[styles.previewIcon, { backgroundColor: categoryMeta.background }]}>
-                    <Text style={[styles.previewIconText, { color: categoryMeta.color }]}>{categoryMeta.icon}</Text>
+            {/* Coluna do preview - apenas em desktop/tablet */}
+            {!isMobileLayout && (
+              <View style={styles.previewColumn}>
+                <Card style={styles.previewCardDesktop}>
+                  <SectionTitle 
+                    title="Preview do cronograma" 
+                    subtitle="Veja como sua rotina será organizada." 
+                  />
+                  
+                  <View style={styles.previewHeaderDesktop}>
+                    <View style={[styles.previewIconDesktop, { backgroundColor: categoryMeta.background }]}>
+                      <Text style={[styles.previewIconTextDesktop, { color: categoryMeta.color }]}>
+                        {categoryMeta.icon}
+                      </Text>
+                    </View>
+                    <View style={styles.previewHeaderInfoDesktop}>
+                      <Text style={styles.previewTitleDesktop}>
+                        {title || "Seu novo cronograma"}
+                      </Text>
+                      <Text style={styles.previewDescriptionDesktop}>
+                        {description || "Rotina com contexto, lembretes e organização inteligente."}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.previewTitle}>{title || "Seu novo cronograma"}</Text>
-                    <Text style={styles.previewDescription}>{description || "Rotina com contexto, lembretes e organização inteligente."}</Text>
+                  
+                  <View style={styles.previewRowsDesktop}>
+                    <View style={styles.previewRowDesktop}>
+                      <Text style={styles.previewLabelDesktop}>Categoria</Text>
+                      <Text style={styles.previewValueDesktop}>{categoryMeta.label}</Text>
+                    </View>
+                    <View style={styles.previewRowDesktop}>
+                      <Text style={styles.previewLabelDesktop}>Alarmes</Text>
+                      <Text style={styles.previewValueDesktop}>{alarmsEnabled ? "Ativados" : "Desativados"}</Text>
+                    </View>
+                    <View style={styles.previewRowDesktop}>
+                      <Text style={styles.previewLabelDesktop}>Lembrete antes</Text>
+                      <Text style={styles.previewValueDesktop}>{reminderBeforeMinutes} min</Text>
+                    </View>
+                    <View style={styles.previewRowDesktop}>
+                      <Text style={styles.previewLabelDesktop}>Prioridade</Text>
+                      <Text style={styles.previewValueDesktop}>{priority}</Text>
+                    </View>
                   </View>
-                </View>
-                <View style={styles.previewRows}>
-                  <View style={styles.previewRow}><Text style={styles.previewLabel}>Categoria</Text><Text style={styles.previewValue}>{categoryMeta.label}</Text></View>
-                  <View style={styles.previewRow}><Text style={styles.previewLabel}>Alarmes</Text><Text style={styles.previewValue}>{alarmsEnabled ? "Ativados" : "Desativados"}</Text></View>
-                  <View style={styles.previewRow}><Text style={styles.previewLabel}>Lembrete antes</Text><Text style={styles.previewValue}>{reminderBeforeMinutes} min</Text></View>
-                  <View style={styles.previewRow}><Text style={styles.previewLabel}>Prioridade</Text><Text style={styles.previewValue}>{priority}</Text></View>
-                </View>
-              </Card>
+                </Card>
 
-              <Card style={styles.aiCard}>
-                <Text style={styles.aiTitle}>Assistente de Rotina AI ✦</Text>
-                <Text style={styles.aiText}>Com base nas informações fornecidas, a IA poderá sugerir horários ideais, revisões e alertas mais precisos.</Text>
-                <Button title="Gerar cronograma com IA" variant="ai" onPress={() => router.push("/ai-prompt")} style={{ marginTop: spacing.lg }} />
-              </Card>
-            </View>
+                <Card style={styles.aiCard}>
+                  <Text style={styles.aiTitle}>Assistente de Rotina AI ✦</Text>
+                  <Text style={styles.aiText}>
+                    Com base nas informações fornecidas, a IA poderá sugerir horários ideais, revisões e alertas mais precisos.
+                  </Text>
+                  <Button 
+                    title="Gerar cronograma com IA" 
+                    variant="ai" 
+                    onPress={() => router.push("/ai-prompt")} 
+                    style={{ marginTop: spacing.lg }} 
+                  />
+                </Card>
+              </View>
+            )}
           </View>
-        </View>
+
+          {/* Card AI no mobile - aparece no final */}
+          {isMobileLayout && (
+            <Card style={styles.aiCardMobile}>
+              <Text style={styles.aiTitle}>Assistente de Rotina AI ✦</Text>
+              <Text style={styles.aiText}>
+                A IA pode sugerir horários ideais e alertas mais precisos.
+              </Text>
+              <Button 
+                title="Gerar cronograma com IA" 
+                variant="ai" 
+                onPress={() => router.push("/ai-prompt")} 
+                style={{ marginTop: spacing.md }} 
+              />
+            </Card>
+          )}
+        </KeyboardAvoidingView>
       )}
     </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  backButton: { height: 42, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
-  backText: { color: colors.text, fontFamily: fonts.bold },
-  grid: { flexDirection: "row", gap: spacing.xl, alignItems: "flex-start" },
-  formColumn: { flex: 1.7 },
-  previewColumn: { flex: 0.85, gap: spacing.lg },
-  sectionCard: { marginBottom: spacing.lg },
-  categoryRow: { gap: spacing.sm, paddingVertical: spacing.xs },
-  categoryPill: { height: 42, borderRadius: radius.pill, paddingHorizontal: spacing.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
-  categoryText: { color: colors.textMuted, fontFamily: fonts.bold },
-  settingGrid: { flexDirection: "row", gap: spacing.md },
-  settingBox: { flex: 1, minHeight: 86, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceMuted, padding: spacing.lg, justifyContent: "center" },
-  settingTitle: { color: colors.text, fontFamily: fonts.bold, marginBottom: spacing.xs },
-  settingText: { color: colors.textMuted, fontFamily: fonts.medium },
-  footerActions: { flexDirection: "row", gap: spacing.md, marginBottom: spacing.xxxl },
-  footerButton: { flex: 1 },
-  previewCard: { padding: spacing.xl },
-  previewHeader: { flexDirection: "row", gap: spacing.md, alignItems: "center", paddingBottom: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  previewIcon: { width: 64, height: 64, borderRadius: 22, alignItems: "center", justifyContent: "center" },
-  previewIconText: { fontFamily: fonts.title, fontSize: 26 },
-  previewTitle: { color: colors.text, fontFamily: fonts.title, fontSize: 18 },
-  previewDescription: { color: colors.textMuted, fontFamily: fonts.regular, lineHeight: 20, marginTop: spacing.xs },
-  previewRows: { marginTop: spacing.lg, gap: spacing.md },
-  previewRow: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md },
-  previewLabel: { color: colors.textMuted, fontFamily: fonts.medium },
-  previewValue: { color: colors.text, fontFamily: fonts.bold },
-  aiCard: { borderColor: "#DDD6FE" },
-  aiTitle: { color: colors.accent, fontFamily: fonts.title, fontSize: 18 },
-  aiText: { color: colors.textMuted, fontFamily: fonts.regular, lineHeight: 21, marginTop: spacing.sm }
+  keyboardView: {
+    flex: 1
+  },
+  
+  backButton: { 
+    minHeight: 44,
+    paddingHorizontal: spacing.md, 
+    borderRadius: radius.md, 
+    backgroundColor: colors.surface, 
+    borderWidth: 1, 
+    borderColor: colors.border, 
+    alignItems: "center", 
+    justifyContent: "center" 
+  },
+  backText: { 
+    color: colors.text, 
+    fontFamily: fonts.bold,
+    fontSize: 14
+  },
+  
+  // Grid layout
+  grid: { 
+    flexDirection: "row", 
+    gap: spacing.xl, 
+    alignItems: "flex-start" 
+  },
+  gridMobile: {
+    flexDirection: "column",
+    gap: spacing.md
+  },
+  
+  // Form column
+  formColumn: { 
+    flex: 1.7 
+  },
+  formColumnMobile: {
+    flex: 1,
+    width: "100%"
+  },
+  
+  // Preview column (desktop)
+  previewColumn: { 
+    flex: 0.85, 
+    gap: spacing.lg 
+  },
+  
+  // Section cards
+  sectionCard: { 
+    marginBottom: spacing.md 
+  },
+  
+  // Categories
+  categoryRow: { 
+    gap: spacing.sm, 
+    paddingVertical: spacing.xs,
+    paddingRight: spacing.md
+  },
+  categoryPill: { 
+    minHeight: 44, 
+    borderRadius: radius.pill, 
+    paddingHorizontal: spacing.lg, 
+    borderWidth: 1, 
+    borderColor: colors.border, 
+    backgroundColor: colors.surface, 
+    alignItems: "center", 
+    justifyContent: "center" 
+  },
+  categoryText: { 
+    color: colors.textMuted, 
+    fontFamily: fonts.bold,
+    fontSize: 13
+  },
+  
+  // Settings grid
+  settingGrid: { 
+    flexDirection: "row", 
+    gap: spacing.md,
+    flexWrap: "wrap"
+  },
+  settingGridMobile: {
+    flexDirection: "column"
+  },
+  settingBox: { 
+    flex: 1, 
+    minWidth: 140,
+    minHeight: 72, 
+    borderRadius: radius.lg, 
+    borderWidth: 1, 
+    borderColor: colors.border, 
+    backgroundColor: colors.surfaceMuted, 
+    padding: spacing.md, 
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md
+  },
+  settingBoxMobile: {
+    flex: undefined,
+    width: "100%",
+    minHeight: 64
+  },
+  settingIcon: {
+    fontSize: 24,
+    color: colors.primary
+  },
+  settingInfo: {
+    flex: 1
+  },
+  settingTitle: { 
+    color: colors.text, 
+    fontFamily: fonts.bold, 
+    fontSize: 14,
+    marginBottom: 2
+  },
+  settingText: { 
+    color: colors.textMuted, 
+    fontFamily: fonts.medium,
+    fontSize: 13
+  },
+  
+  // Footer actions
+  footerActions: { 
+    flexDirection: "row", 
+    gap: spacing.md, 
+    marginBottom: spacing.xl,
+    marginTop: spacing.sm
+  },
+  footerActionsMobile: {
+    flexDirection: "column-reverse"
+  },
+  footerButton: { 
+    flex: 1,
+    minHeight: 48
+  },
+  footerButtonMobile: {
+    flex: undefined,
+    width: "100%"
+  },
+  footerButtonPrimary: {},
+  
+  // Preview card (mobile - colapsavel)
+  previewCard: { 
+    marginBottom: spacing.md,
+    padding: spacing.md
+  },
+  previewHeader: { 
+    flexDirection: "row", 
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  previewHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    flex: 1,
+    minWidth: 0
+  },
+  previewIcon: { 
+    width: 48, 
+    height: 48, 
+    borderRadius: 16, 
+    alignItems: "center", 
+    justifyContent: "center" 
+  },
+  previewIconText: { 
+    fontFamily: fonts.title, 
+    fontSize: 22 
+  },
+  previewHeaderInfo: {
+    flex: 1,
+    minWidth: 0
+  },
+  previewTitle: { 
+    color: colors.text, 
+    fontFamily: fonts.bold, 
+    fontSize: 15 
+  },
+  previewSubtitle: {
+    color: colors.textMuted,
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    marginTop: 2
+  },
+  expandIcon: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginLeft: spacing.sm
+  },
+  previewContent: {
+    marginTop: spacing.md
+  },
+  previewDescription: { 
+    color: colors.textMuted, 
+    fontFamily: fonts.regular, 
+    lineHeight: 20,
+    fontSize: 13
+  },
+  previewDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.md
+  },
+  previewRows: { 
+    gap: spacing.sm 
+  },
+  previewRow: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    alignItems: "center"
+  },
+  previewLabel: { 
+    color: colors.textMuted, 
+    fontFamily: fonts.medium,
+    fontSize: 13
+  },
+  previewValue: { 
+    color: colors.text, 
+    fontFamily: fonts.bold,
+    fontSize: 13
+  },
+  
+  // Preview card (desktop)
+  previewCardDesktop: { 
+    padding: spacing.xl 
+  },
+  previewHeaderDesktop: { 
+    flexDirection: "row", 
+    gap: spacing.md, 
+    alignItems: "center", 
+    paddingBottom: spacing.lg, 
+    borderBottomWidth: 1, 
+    borderBottomColor: colors.border 
+  },
+  previewIconDesktop: { 
+    width: 64, 
+    height: 64, 
+    borderRadius: 22, 
+    alignItems: "center", 
+    justifyContent: "center" 
+  },
+  previewIconTextDesktop: { 
+    fontFamily: fonts.title, 
+    fontSize: 26 
+  },
+  previewHeaderInfoDesktop: {
+    flex: 1,
+    minWidth: 0
+  },
+  previewTitleDesktop: { 
+    color: colors.text, 
+    fontFamily: fonts.title, 
+    fontSize: 18 
+  },
+  previewDescriptionDesktop: { 
+    color: colors.textMuted, 
+    fontFamily: fonts.regular, 
+    lineHeight: 20, 
+    marginTop: spacing.xs 
+  },
+  previewRowsDesktop: { 
+    marginTop: spacing.lg, 
+    gap: spacing.md 
+  },
+  previewRowDesktop: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    gap: spacing.md 
+  },
+  previewLabelDesktop: { 
+    color: colors.textMuted, 
+    fontFamily: fonts.medium 
+  },
+  previewValueDesktop: { 
+    color: colors.text, 
+    fontFamily: fonts.bold 
+  },
+  
+  // AI Card
+  aiCard: { 
+    borderColor: "#DDD6FE",
+    padding: spacing.xl
+  },
+  aiCardMobile: {
+    borderColor: "#DDD6FE",
+    marginTop: spacing.md,
+    marginBottom: spacing.xl
+  },
+  aiTitle: { 
+    color: colors.accent, 
+    fontFamily: fonts.title, 
+    fontSize: 16 
+  },
+  aiText: { 
+    color: colors.textMuted, 
+    fontFamily: fonts.regular, 
+    lineHeight: 20, 
+    marginTop: spacing.sm,
+    fontSize: 13
+  }
 });

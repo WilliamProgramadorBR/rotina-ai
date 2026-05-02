@@ -1,5 +1,5 @@
 import React from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle, useWindowDimensions } from "react-native";
 
 type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 
@@ -21,20 +21,36 @@ export function Button({
   style,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
+  const { width } = useWindowDimensions();
+  
+  // Altura minima responsiva - maior em telas pequenas para melhor touch target
+  const minHeight = width < 360 ? 48 : 52;
+  // Tamanho da fonte responsivo
+  const fontSize = width < 360 ? 15 : 16;
 
   return (
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
+      accessible
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled }}
       style={({ pressed }) => [
         styles.base,
+        { minHeight },
         styles[variant],
         pressed && !isDisabled ? styles.pressed : null,
         isDisabled ? styles.disabled : null,
         style,
       ]}
     >
-      {loading ? <ActivityIndicator /> : <Text style={[styles.text, styles[`${variant}Text`]]}>{title}</Text>}
+      {loading ? (
+        <ActivityIndicator color={variant === "primary" ? "#052E16" : "#E2E8F0"} />
+      ) : (
+        <Text style={[styles.text, styles[`${variant}Text`], { fontSize }]}>
+          {title}
+        </Text>
+      )}
     </Pressable>
   );
 }
@@ -46,6 +62,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,
+    paddingVertical: 12,
+    width: "100%"
   },
   primary: {
     backgroundColor: "#22C55E",
@@ -76,6 +94,7 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 16,
     fontWeight: "700",
+    textAlign: "center"
   },
   pressed: {
     opacity: 0.8,
