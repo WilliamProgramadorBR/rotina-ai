@@ -1,5 +1,5 @@
 import React from "react";
-import { SafeAreaView, ScrollView, StyleSheet, View } from "react-native";
+import { SafeAreaView, ScrollView, StyleSheet, View, useWindowDimensions, Platform, StatusBar } from "react-native";
 
 type ScreenProps = {
   children: React.ReactNode;
@@ -7,10 +7,29 @@ type ScreenProps = {
 };
 
 export function Screen({ children, scroll = true }: ScreenProps) {
+  const { width } = useWindowDimensions();
+  
+  // Padding horizontal responsivo baseado na largura da tela
+  const horizontalPadding = width < 360 ? 12 : width < 400 ? 16 : 20;
+  
+  // Padding top considerando a status bar no Android
+  const topPadding = Platform.OS === "android" ? (StatusBar.currentHeight || 24) + 8 : 0;
+
   if (scroll) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+        <ScrollView 
+          contentContainerStyle={[
+            styles.scrollContent,
+            { 
+              paddingHorizontal: horizontalPadding,
+              paddingTop: topPadding || 20
+            }
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           {children}
         </ScrollView>
       </SafeAreaView>
@@ -19,7 +38,16 @@ export function Screen({ children, scroll = true }: ScreenProps) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.content}>{children}</View>
+      <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+      <View style={[
+        styles.content,
+        { 
+          paddingHorizontal: horizontalPadding,
+          paddingTop: topPadding || 20
+        }
+      ]}>
+        {children}
+      </View>
     </SafeAreaView>
   );
 }
@@ -31,10 +59,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    padding: 20,
+    paddingBottom: 40,
   },
   content: {
     flex: 1,
-    padding: 20,
   },
 });
