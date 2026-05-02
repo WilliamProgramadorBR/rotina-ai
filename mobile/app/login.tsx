@@ -1,20 +1,36 @@
 import { useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { 
+  ActivityIndicator, 
+  Alert, 
+  KeyboardAvoidingView, 
+  Platform, 
+  Pressable, 
+  ScrollView,
+  StyleSheet, 
+  Text, 
+  TextInput, 
+  View,
+  useWindowDimensions
+} from "react-native";
 import { router } from "expo-router";
 import { useAuth } from "../src/context/AuthContext";
-import { colors, fonts, radius, shadow, spacing } from "../src/theme";
+import { colors, fonts, radius, shadow, spacing, scaledFont } from "../src/theme";
+import { useResponsive } from "../src/hooks/useResponsive";
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
+  const { width, isPhone, isPhoneLarge, paddingHorizontal } = useResponsive();
   const [email, setEmail] = useState("william100william@gmail.com");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const isMobileLayout = isPhone || isPhoneLarge;
+
   async function handleLogin() {
     try {
       if (!email || !password) {
-        Alert.alert("Atenção", "Informe e-mail e senha.");
+        Alert.alert("Atencao", "Informe e-mail e senha.");
         return;
       }
       setIsSubmitting(true);
@@ -22,125 +38,570 @@ export default function LoginScreen() {
       router.replace("/home");
     } catch (error: any) {
       console.log("[LOGIN ERROR]", error?.response?.data || error);
-      Alert.alert("Erro ao entrar", error?.response?.data?.message || "Não foi possível fazer login.");
+      Alert.alert("Erro ao entrar", error?.response?.data?.message || "Nao foi possivel fazer login.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <KeyboardAvoidingView style={styles.root} behavior={Platform.select({ ios: "padding", android: undefined })}>
-      <View style={styles.glowOne} />
-      <View style={styles.glowTwo} />
+    <KeyboardAvoidingView 
+      style={styles.root} 
+      behavior={Platform.select({ ios: "padding", android: undefined })}
+    >
+      {/* Background Effects */}
+      <View style={[styles.glowOne, isMobileLayout && styles.glowOneMobile]} />
+      <View style={[styles.glowTwo, isMobileLayout && styles.glowTwoMobile]} />
 
-      <View style={styles.content}>
-        <View style={styles.card}>
-          <View style={styles.brandRow}>
-            <View style={styles.logo}><Text style={styles.logoText}>✦</Text></View>
-            <Text style={styles.brand}>Rotina <Text style={styles.brandAccent}>AI</Text></Text>
-          </View>
+      <ScrollView 
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingHorizontal: isMobileLayout ? spacing.lg : spacing.xxl }
+        ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={[styles.content, isMobileLayout && styles.contentMobile]}>
+          {/* Login Card */}
+          <View style={[
+            styles.card, 
+            isMobileLayout && styles.cardMobile,
+            { padding: isMobileLayout ? spacing.xl : spacing.xxl }
+          ]}>
+            {/* Brand */}
+            <View style={styles.brandRow}>
+              <View style={[styles.logo, isMobileLayout && styles.logoMobile]}>
+                <Text style={[styles.logoText, { fontSize: scaledFont(isMobileLayout ? 18 : 22, width) }]}>*</Text>
+              </View>
+              <Text style={[styles.brand, { fontSize: scaledFont(isMobileLayout ? 22 : 26, width) }]}>
+                Rotina <Text style={styles.brandAccent}>AI</Text>
+              </Text>
+            </View>
 
-          <Text style={styles.title}>Entre na sua rotina inteligente</Text>
-          <Text style={styles.subtitle}>Centralize suas tarefas, automatize seu dia e acompanhe seus lembretes com foco.</Text>
+            {/* Title */}
+            <Text style={[styles.title, { fontSize: scaledFont(isMobileLayout ? 24 : 32, width) }]}>
+              Entre na sua rotina inteligente
+            </Text>
+            <Text style={[styles.subtitle, { fontSize: scaledFont(14, width) }]}>
+              Centralize suas tarefas, automatize seu dia e acompanhe seus lembretes com foco.
+            </Text>
 
-          <Text style={styles.label}>E-mail</Text>
-          <View style={styles.inputShell}>
-            <Text style={styles.inputIcon}>✉</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="seu@email.com"
-              placeholderTextColor="#8A97AD"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              value={email}
-              onChangeText={setEmail}
-            />
-          </View>
+            {/* Email Input */}
+            <Text style={[styles.label, { fontSize: scaledFont(13, width) }]}>E-mail</Text>
+            <View style={[styles.inputShell, isMobileLayout && styles.inputShellMobile]}>
+              <View style={styles.inputIconBox}>
+                <Text style={styles.inputIcon}>@</Text>
+              </View>
+              <TextInput
+                style={[styles.input, { fontSize: scaledFont(15, width) }]}
+                placeholder="seu@email.com"
+                placeholderTextColor="#6B7A94"
+                autoCapitalize="none"
+                keyboardType="email-address"
+                value={email}
+                onChangeText={setEmail}
+              />
+            </View>
 
-          <Text style={styles.label}>Senha</Text>
-          <View style={styles.inputShell}>
-            <Text style={styles.inputIcon}>▣</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Digite sua senha"
-              placeholderTextColor="#8A97AD"
-              secureTextEntry={!showPassword}
-              value={password}
-              onChangeText={setPassword}
-              autoCapitalize="none"
-            />
-            <Pressable onPress={() => setShowPassword((current) => !current)}>
-              <Text style={styles.showText}>{showPassword ? "Ocultar" : "Mostrar"}</Text>
+            {/* Password Input */}
+            <Text style={[styles.label, { fontSize: scaledFont(13, width) }]}>Senha</Text>
+            <View style={[styles.inputShell, isMobileLayout && styles.inputShellMobile]}>
+              <View style={styles.inputIconBox}>
+                <Text style={styles.inputIcon}>#</Text>
+              </View>
+              <TextInput
+                style={[styles.input, { fontSize: scaledFont(15, width) }]}
+                placeholder="Digite sua senha"
+                placeholderTextColor="#6B7A94"
+                secureTextEntry={!showPassword}
+                value={password}
+                onChangeText={setPassword}
+                autoCapitalize="none"
+              />
+              <Pressable onPress={() => setShowPassword((current) => !current)} style={styles.showButton}>
+                <Text style={[styles.showText, { fontSize: scaledFont(13, width) }]}>
+                  {showPassword ? "Ocultar" : "Mostrar"}
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Options */}
+            <View style={[styles.loginOptions, isMobileLayout && styles.loginOptionsMobile]}>
+              <View style={styles.rememberRow}>
+                <View style={styles.checkbox} />
+                <Text style={[styles.remember, { fontSize: scaledFont(13, width) }]}>Lembrar de mim</Text>
+              </View>
+              <Pressable>
+                <Text style={[styles.forgot, { fontSize: scaledFont(13, width) }]}>Esqueci minha senha</Text>
+              </Pressable>
+            </View>
+
+            {/* Submit Button */}
+            <Pressable 
+              style={[styles.primaryButton, isMobileLayout && styles.primaryButtonMobile]} 
+              onPress={handleLogin} 
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={[styles.primaryButtonText, { fontSize: scaledFont(15, width) }]}>Entrar</Text>
+              )}
             </Pressable>
+
+            {/* Divider */}
+            <View style={styles.dividerRow}>
+              <View style={styles.divider} />
+              <Text style={[styles.dividerText, { fontSize: scaledFont(12, width) }]}>ou</Text>
+              <View style={styles.divider} />
+            </View>
+
+            {/* Register Button */}
+            <Pressable 
+              style={[styles.secondaryButton, isMobileLayout && styles.secondaryButtonMobile]} 
+              onPress={() => router.push("/register")}
+            >
+              <Text style={[styles.secondaryButtonText, { fontSize: scaledFont(14, width) }]}>Criar uma conta</Text>
+            </Pressable>
+
+            {/* Security Note */}
+            <View style={styles.secureRow}>
+              <View style={styles.secureIcon}>
+                <Text style={styles.secureIconText}>*</Text>
+              </View>
+              <Text style={[styles.secureText, { fontSize: scaledFont(12, width) }]}>
+                Seus dados estao protegidos com criptografia de ponta.
+              </Text>
+            </View>
           </View>
 
-          <View style={styles.loginOptions}>
-            <Text style={styles.remember}>✓ Lembrar de mim</Text>
-            <Text style={styles.forgot}>Esqueci minha senha</Text>
-          </View>
-
-          <Pressable style={styles.primaryButton} onPress={handleLogin} disabled={isSubmitting}>
-            {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Entrar</Text>}
-          </Pressable>
-
-          <View style={styles.dividerRow}><View style={styles.divider} /><Text style={styles.dividerText}>ou</Text><View style={styles.divider} /></View>
-
-          <Pressable style={styles.secondaryButton} onPress={() => router.push("/register")}>
-            <Text style={styles.secondaryButtonText}>Criar uma conta</Text>
-          </Pressable>
-
-          <Text style={styles.secureText}>◇ Seus dados estão protegidos com criptografia de ponta.</Text>
+          {/* Hero Side - Only on Desktop */}
+          {!isMobileLayout && (
+            <View style={styles.heroSide}>
+              <View style={styles.botOrb}>
+                <Text style={styles.botText}>AI</Text>
+              </View>
+              
+              <View style={[styles.floatTask, styles.floatTaskOne]}>
+                <View style={styles.floatTaskIcon}>
+                  <Text style={styles.floatTaskIconText}>E</Text>
+                </View>
+                <View>
+                  <Text style={styles.floatTitle}>Estudar ingles</Text>
+                  <Text style={styles.floatText}>20:00 - 30 min</Text>
+                </View>
+              </View>
+              
+              <View style={[styles.floatTask, styles.floatTaskTwo]}>
+                <View style={[styles.floatTaskIcon, { backgroundColor: "rgba(16, 185, 129, 0.2)" }]}>
+                  <Text style={[styles.floatTaskIconText, { color: "#10B981" }]}>T</Text>
+                </View>
+                <View>
+                  <Text style={styles.floatTitle}>Exercicio leve</Text>
+                  <Text style={styles.floatText}>21:00 - 45 min</Text>
+                </View>
+              </View>
+              
+              <Text style={styles.heroTitle}>Inteligencia que organiza. Voce que realiza.</Text>
+              <Text style={styles.heroText}>
+                A Rotina AI transforma seus planos em acao com foco, clareza e consistencia.
+              </Text>
+            </View>
+          )}
         </View>
-
-        <View style={styles.heroSide}>
-          <View style={styles.botOrb}><Text style={styles.botText}>AI</Text></View>
-          <View style={[styles.floatTask, styles.floatTaskOne]}><Text style={styles.floatTitle}>Estudar inglês</Text><Text style={styles.floatText}>20:00 • 30 min</Text></View>
-          <View style={[styles.floatTask, styles.floatTaskTwo]}><Text style={styles.floatTitle}>Exercício leve</Text><Text style={styles.floatText}>21:00 • 45 min</Text></View>
-          <Text style={styles.heroTitle}>Inteligência que organiza. Você que realiza.</Text>
-          <Text style={styles.heroText}>A Rotina AI transforma seus planos em ação com foco, clareza e consistência.</Text>
-        </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#070B16", justifyContent: "center", padding: spacing.xxl, overflow: "hidden" },
-  glowOne: { position: "absolute", width: 420, height: 420, borderRadius: 210, backgroundColor: "#1D4ED8", opacity: 0.18, right: 120, top: 100 },
-  glowTwo: { position: "absolute", width: 360, height: 360, borderRadius: 180, backgroundColor: "#7C3AED", opacity: 0.16, left: 70, bottom: 40 },
-  content: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xxxl },
-  card: { width: 560, backgroundColor: "rgba(17,26,46,0.88)", borderRadius: 34, padding: spacing.xxl, borderWidth: 1, borderColor: "rgba(255,255,255,0.13)", ...shadow.glow },
-  brandRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginBottom: spacing.xl },
-  logo: { width: 44, height: 44, borderRadius: 16, backgroundColor: "rgba(79,124,255,0.17)", alignItems: "center", justifyContent: "center" },
-  logoText: { color: "#22D3EE", fontSize: 24 },
-  brand: { color: colors.white, fontFamily: fonts.title, fontSize: 28 },
-  brandAccent: { color: "#8B5CF6" },
-  title: { color: colors.white, fontFamily: fonts.title, fontSize: 40, lineHeight: 48, maxWidth: 440 },
-  subtitle: { color: "#C7D2E5", fontFamily: fonts.regular, lineHeight: 24, marginTop: spacing.md, marginBottom: spacing.xl },
-  label: { color: "#E5E7EB", fontFamily: fonts.bold, marginBottom: spacing.sm },
-  inputShell: { height: 56, borderRadius: radius.lg, borderWidth: 1, borderColor: "rgba(255,255,255,0.16)", backgroundColor: "rgba(255,255,255,0.06)", flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.md, marginBottom: spacing.lg },
-  inputIcon: { color: "#AAB6CC", fontSize: 18, width: 28 },
-  input: { flex: 1, color: colors.white, fontFamily: fonts.regular, fontSize: 15, height: "100%" },
-  showText: { color: "#9D6BFF", fontFamily: fonts.bold },
-  loginOptions: { flexDirection: "row", justifyContent: "space-between", marginBottom: spacing.lg },
-  remember: { color: "#C7D2E5", fontFamily: fonts.medium },
-  forgot: { color: "#A78BFA", fontFamily: fonts.bold },
-  primaryButton: { height: 58, borderRadius: radius.lg, backgroundColor: "#2563EB", alignItems: "center", justifyContent: "center", ...shadow.glow },
-  primaryButtonText: { color: colors.white, fontFamily: fonts.title, fontSize: 17 },
-  dividerRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginVertical: spacing.xl },
-  divider: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.12)" },
-  dividerText: { color: "#8A97AD", fontFamily: fonts.medium },
-  secondaryButton: { height: 56, borderRadius: radius.lg, borderWidth: 1, borderColor: "rgba(255,255,255,0.16)", alignItems: "center", justifyContent: "center" },
-  secondaryButtonText: { color: colors.white, fontFamily: fonts.bold },
-  secureText: { color: "#8A97AD", fontFamily: fonts.regular, textAlign: "center", marginTop: spacing.xl },
-  heroSide: { width: 620, minHeight: 560, alignItems: "center", justifyContent: "center" },
-  botOrb: { width: 170, height: 170, borderRadius: 85, backgroundColor: "rgba(79,124,255,0.20)", borderWidth: 1, borderColor: "rgba(34,211,238,0.34)", alignItems: "center", justifyContent: "center", ...shadow.glow },
-  botText: { color: "#22D3EE", fontFamily: fonts.title, fontSize: 42 },
-  floatTask: { position: "absolute", width: 230, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", padding: spacing.lg },
-  floatTaskOne: { right: 30, top: 120 },
-  floatTaskTwo: { right: 60, top: 230 },
-  floatTitle: { color: colors.white, fontFamily: fonts.bold },
-  floatText: { color: "#AAB6CC", fontFamily: fonts.regular, marginTop: 4 },
-  heroTitle: { color: colors.white, fontFamily: fonts.title, fontSize: 28, textAlign: "center", marginTop: spacing.xxxl },
-  heroText: { color: "#C7D2E5", fontFamily: fonts.regular, lineHeight: 23, textAlign: "center", marginTop: spacing.sm, maxWidth: 560 }
+  root: { 
+    flex: 1, 
+    backgroundColor: "#070B16" 
+  },
+  
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingVertical: spacing.xxl
+  },
+  
+  glowOne: { 
+    position: "absolute", 
+    width: 350, 
+    height: 350, 
+    borderRadius: 175, 
+    backgroundColor: "#1D4ED8", 
+    opacity: 0.12, 
+    right: 80, 
+    top: 60 
+  },
+  glowOneMobile: {
+    width: 200,
+    height: 200,
+    right: -40,
+    top: 40
+  },
+  
+  glowTwo: { 
+    position: "absolute", 
+    width: 280, 
+    height: 280, 
+    borderRadius: 140, 
+    backgroundColor: "#7C3AED", 
+    opacity: 0.1, 
+    left: 40, 
+    bottom: 20 
+  },
+  glowTwoMobile: {
+    width: 160,
+    height: 160,
+    left: -40,
+    bottom: 60
+  },
+  
+  content: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    justifyContent: "center", 
+    gap: spacing.xxxl 
+  },
+  contentMobile: {
+    flexDirection: "column",
+    gap: spacing.xl
+  },
+  
+  card: { 
+    width: "100%",
+    maxWidth: 480, 
+    backgroundColor: "rgba(17,26,46,0.92)", 
+    borderRadius: 28, 
+    borderWidth: 1, 
+    borderColor: "rgba(255,255,255,0.1)", 
+    ...shadow.glow 
+  },
+  cardMobile: {
+    maxWidth: "100%",
+    borderRadius: 24
+  },
+  
+  brandRow: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    gap: spacing.md, 
+    marginBottom: spacing.xl 
+  },
+  
+  logo: { 
+    width: 44, 
+    height: 44, 
+    borderRadius: 14, 
+    backgroundColor: "rgba(79,124,255,0.2)", 
+    alignItems: "center", 
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(79,124,255,0.3)"
+  },
+  logoMobile: {
+    width: 40,
+    height: 40,
+    borderRadius: 12
+  },
+  
+  logoText: { 
+    color: "#60A5FA", 
+    fontFamily: fonts.title 
+  },
+  
+  brand: { 
+    color: colors.white, 
+    fontFamily: fonts.title 
+  },
+  
+  brandAccent: { 
+    color: "#A78BFA" 
+  },
+  
+  title: { 
+    color: colors.white, 
+    fontFamily: fonts.title, 
+    lineHeight: 40,
+    maxWidth: 380 
+  },
+  
+  subtitle: { 
+    color: "#94A3B8", 
+    fontFamily: fonts.regular, 
+    lineHeight: 22, 
+    marginTop: spacing.md, 
+    marginBottom: spacing.xl 
+  },
+  
+  label: { 
+    color: "#E5E7EB", 
+    fontFamily: fonts.bold, 
+    marginBottom: spacing.sm 
+  },
+  
+  inputShell: { 
+    height: 52, 
+    borderRadius: radius.lg, 
+    borderWidth: 1, 
+    borderColor: "rgba(255,255,255,0.12)", 
+    backgroundColor: "rgba(255,255,255,0.05)", 
+    flexDirection: "row", 
+    alignItems: "center", 
+    paddingHorizontal: spacing.sm, 
+    marginBottom: spacing.lg 
+  },
+  inputShellMobile: {
+    height: 50
+  },
+  
+  inputIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "rgba(79,124,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: spacing.sm
+  },
+  
+  inputIcon: { 
+    color: "#60A5FA", 
+    fontFamily: fonts.bold,
+    fontSize: 14 
+  },
+  
+  input: { 
+    flex: 1, 
+    color: colors.white, 
+    fontFamily: fonts.regular, 
+    height: "100%" 
+  },
+  
+  showButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm
+  },
+  
+  showText: { 
+    color: "#A78BFA", 
+    fontFamily: fonts.bold 
+  },
+  
+  loginOptions: { 
+    flexDirection: "row", 
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing.lg,
+    gap: spacing.md
+  },
+  loginOptionsMobile: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: spacing.sm
+  },
+  
+  rememberRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm
+  },
+  
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.05)"
+  },
+  
+  remember: { 
+    color: "#94A3B8", 
+    fontFamily: fonts.medium 
+  },
+  
+  forgot: { 
+    color: "#A78BFA", 
+    fontFamily: fonts.bold 
+  },
+  
+  primaryButton: { 
+    height: 54, 
+    borderRadius: radius.lg, 
+    backgroundColor: "#2563EB", 
+    alignItems: "center", 
+    justifyContent: "center", 
+    ...shadow.glow 
+  },
+  primaryButtonMobile: {
+    height: 50
+  },
+  
+  primaryButtonText: { 
+    color: colors.white, 
+    fontFamily: fonts.bold 
+  },
+  
+  dividerRow: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    gap: spacing.md, 
+    marginVertical: spacing.xl 
+  },
+  
+  divider: { 
+    flex: 1, 
+    height: 1, 
+    backgroundColor: "rgba(255,255,255,0.08)" 
+  },
+  
+  dividerText: { 
+    color: "#6B7A94", 
+    fontFamily: fonts.medium 
+  },
+  
+  secondaryButton: { 
+    height: 52, 
+    borderRadius: radius.lg, 
+    borderWidth: 1, 
+    borderColor: "rgba(255,255,255,0.12)", 
+    backgroundColor: "rgba(255,255,255,0.03)",
+    alignItems: "center", 
+    justifyContent: "center" 
+  },
+  secondaryButtonMobile: {
+    height: 48
+  },
+  
+  secondaryButtonText: { 
+    color: colors.white, 
+    fontFamily: fonts.bold 
+  },
+  
+  secureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    marginTop: spacing.xl
+  },
+  
+  secureIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  
+  secureIconText: {
+    color: "#10B981",
+    fontSize: 10,
+    fontFamily: fonts.bold
+  },
+  
+  secureText: { 
+    color: "#6B7A94", 
+    fontFamily: fonts.regular,
+    flex: 1
+  },
+  
+  heroSide: { 
+    width: 500, 
+    minHeight: 480, 
+    alignItems: "center", 
+    justifyContent: "center",
+    position: "relative"
+  },
+  
+  botOrb: { 
+    width: 140, 
+    height: 140, 
+    borderRadius: 70, 
+    backgroundColor: "rgba(79,124,255,0.15)", 
+    borderWidth: 1, 
+    borderColor: "rgba(34,211,238,0.25)", 
+    alignItems: "center", 
+    justifyContent: "center", 
+    ...shadow.glow 
+  },
+  
+  botText: { 
+    color: "#22D3EE", 
+    fontFamily: fonts.title, 
+    fontSize: 36 
+  },
+  
+  floatTask: { 
+    position: "absolute", 
+    width: 200, 
+    borderRadius: 16, 
+    backgroundColor: "rgba(255,255,255,0.06)", 
+    borderWidth: 1, 
+    borderColor: "rgba(255,255,255,0.1)", 
+    padding: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md
+  },
+  floatTaskOne: { 
+    right: 20, 
+    top: 80 
+  },
+  floatTaskTwo: { 
+    right: 40, 
+    top: 180 
+  },
+  
+  floatTaskIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "rgba(139, 92, 246, 0.2)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  
+  floatTaskIconText: {
+    color: "#A78BFA",
+    fontFamily: fonts.bold,
+    fontSize: 14
+  },
+  
+  floatTitle: { 
+    color: colors.white, 
+    fontFamily: fonts.bold,
+    fontSize: 13
+  },
+  
+  floatText: { 
+    color: "#94A3B8", 
+    fontFamily: fonts.regular, 
+    marginTop: 2,
+    fontSize: 11
+  },
+  
+  heroTitle: { 
+    color: colors.white, 
+    fontFamily: fonts.title, 
+    fontSize: 24, 
+    textAlign: "center", 
+    marginTop: spacing.xxxl,
+    lineHeight: 32
+  },
+  
+  heroText: { 
+    color: "#94A3B8", 
+    fontFamily: fonts.regular, 
+    lineHeight: 22, 
+    textAlign: "center", 
+    marginTop: spacing.sm, 
+    maxWidth: 400,
+    fontSize: 14
+  }
 });

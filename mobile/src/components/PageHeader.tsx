@@ -1,6 +1,6 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { colors, fonts, radius, spacing } from "../theme";
+import { Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { colors, fonts, radius, spacing, scaledFont } from "../theme";
 import { useResponsive } from "../hooks/useResponsive";
 
 type PageHeaderProps = {
@@ -18,45 +18,58 @@ export function PageHeader({
   right,
   searchPlaceholder
 }: PageHeaderProps) {
-  const { isPhone } = useResponsive();
+  const { width, isPhone, isSmallPhone } = useResponsive();
+  const isMobile = isPhone || isSmallPhone;
 
   return (
     <View style={styles.container}>
-      <View style={[styles.topRow, isPhone && styles.topRowPhone]}>
+      <View style={[styles.topRow, isMobile && styles.topRowMobile]}>
         <View style={styles.leftSide}>
           {onMenu ? (
-            <Pressable style={styles.menuButton} onPress={onMenu}>
-              <Text style={styles.menuText}>☰</Text>
+            <Pressable style={[styles.menuButton, isSmallPhone && styles.menuButtonSmall]} onPress={onMenu}>
+              <Text style={[styles.menuText, { fontSize: scaledFont(16, width) }]}>=</Text>
             </Pressable>
           ) : null}
 
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text
-              style={[styles.title, isPhone && styles.titlePhone]}
+              style={[
+                styles.title, 
+                { fontSize: scaledFont(isMobile ? 24 : 30, width) }
+              ]}
               numberOfLines={2}
             >
               {title}
             </Text>
 
             {subtitle ? (
-              <Text style={styles.subtitle} numberOfLines={2}>
+              <Text 
+                style={[styles.subtitle, { fontSize: scaledFont(13, width) }]} 
+                numberOfLines={2}
+              >
                 {subtitle}
               </Text>
             ) : null}
           </View>
         </View>
 
-        {right ? <View style={isPhone ? styles.rightPhone : styles.right}>{right}</View> : null}
+        {right ? (
+          <View style={isMobile ? styles.rightMobile : styles.right}>
+            {right}
+          </View>
+        ) : null}
       </View>
 
       {searchPlaceholder ? (
-        <View style={[styles.bottomRow, isPhone && styles.bottomRowPhone]}>
-          <View style={styles.searchBox}>
-            <Text style={styles.searchIcon}>⌕</Text>
+        <View style={[styles.bottomRow, isMobile && styles.bottomRowMobile]}>
+          <View style={[styles.searchBox, isSmallPhone && styles.searchBoxSmall]}>
+            <View style={styles.searchIconBox}>
+              <Text style={[styles.searchIcon, { fontSize: scaledFont(12, width) }]}>S</Text>
+            </View>
             <TextInput
               placeholder={searchPlaceholder}
               placeholderTextColor={colors.textSoft}
-              style={styles.searchInput}
+              style={[styles.searchInput, { fontSize: scaledFont(14, width) }]}
             />
           </View>
         </View>
@@ -77,9 +90,8 @@ const styles = StyleSheet.create({
     gap: spacing.md
   },
 
-  topRowPhone: {
-    flexDirection: "column",
-    alignItems: "stretch"
+  topRowMobile: {
+    gap: spacing.sm
   },
 
   leftSide: {
@@ -94,13 +106,13 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start"
   },
 
-  rightPhone: {
-    width: "100%"
+  rightMobile: {
+    alignSelf: "flex-start"
   },
 
   menuButton: {
-    width: 44,
-    height: 44,
+    width: 42,
+    height: 42,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -109,60 +121,71 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
 
+  menuButtonSmall: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.md
+  },
+
   menuText: {
-    fontSize: 18,
-    color: colors.text
+    color: colors.text,
+    fontFamily: fonts.bold
   },
 
   title: {
     color: colors.text,
     fontFamily: fonts.title,
-    fontSize: 34,
-    lineHeight: 40
-  },
-
-  titlePhone: {
-    fontSize: 28,
-    lineHeight: 33
+    lineHeight: 36
   },
 
   subtitle: {
     marginTop: 4,
     color: colors.textMuted,
     fontFamily: fonts.medium,
-    fontSize: 14,
-    lineHeight: 20
+    lineHeight: 19
   },
 
   bottomRow: {
     marginTop: spacing.md
   },
 
-  bottomRowPhone: {
-    marginTop: spacing.md
+  bottomRowMobile: {
+    marginTop: spacing.sm
   },
 
   searchBox: {
-    height: 52,
-    borderRadius: radius.xl,
+    height: 48,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm
   },
 
+  searchBoxSmall: {
+    height: 44
+  },
+
+  searchIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+
   searchIcon: {
-    color: colors.textMuted,
-    fontSize: 16
+    color: colors.primary,
+    fontFamily: fonts.bold
   },
 
   searchInput: {
     flex: 1,
     color: colors.text,
-    fontFamily: fonts.regular,
-    fontSize: 15
+    fontFamily: fonts.regular
   }
 });

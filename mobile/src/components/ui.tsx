@@ -7,9 +7,10 @@ import {
   TextInput,
   TextInputProps,
   View,
-  ViewStyle
+  ViewStyle,
+  useWindowDimensions
 } from "react-native";
-import { colors, fonts, radius, shadow, spacing } from "../theme";
+import { colors, fonts, radius, shadow, spacing, typography, scaledFont } from "../theme";
 
 type ButtonProps = {
   title: string;
@@ -17,11 +18,31 @@ type ButtonProps = {
   loading?: boolean;
   disabled?: boolean;
   variant?: "primary" | "secondary" | "ghost" | "danger" | "ai";
+  size?: "sm" | "md" | "lg";
   style?: ViewStyle;
+  fullWidth?: boolean;
 };
 
-export function Button({ title, onPress, loading, disabled, variant = "primary", style }: ButtonProps) {
+export function Button({ 
+  title, 
+  onPress, 
+  loading, 
+  disabled, 
+  variant = "primary", 
+  size = "md",
+  style,
+  fullWidth = false
+}: ButtonProps) {
+  const { width } = useWindowDimensions();
   const isDisabled = Boolean(disabled || loading);
+  
+  const sizeStyles = {
+    sm: { height: 40, paddingHorizontal: spacing.md, fontSize: scaledFont(13, width) },
+    md: { height: 48, paddingHorizontal: spacing.lg, fontSize: scaledFont(14, width) },
+    lg: { height: 54, paddingHorizontal: spacing.xl, fontSize: scaledFont(15, width) },
+  };
+  
+  const currentSize = sizeStyles[size];
 
   return (
     <Pressable
@@ -29,7 +50,9 @@ export function Button({ title, onPress, loading, disabled, variant = "primary",
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.button,
+        { height: currentSize.height, paddingHorizontal: currentSize.paddingHorizontal },
         styles[`button_${variant}`],
+        fullWidth && { width: "100%" },
         pressed && !isDisabled && { opacity: 0.88, transform: [{ scale: 0.99 }] },
         isDisabled && { opacity: 0.6 },
         style
@@ -38,7 +61,9 @@ export function Button({ title, onPress, loading, disabled, variant = "primary",
       {loading ? (
         <ActivityIndicator color={variant === "secondary" || variant === "ghost" ? colors.primary : colors.white} />
       ) : (
-        <Text style={[styles.buttonText, styles[`buttonText_${variant}`]]}>{title}</Text>
+        <Text style={[styles.buttonText, styles[`buttonText_${variant}`], { fontSize: currentSize.fontSize }]}>
+          {title}
+        </Text>
       )}
     </Pressable>
   );
@@ -47,113 +72,292 @@ export function Button({ title, onPress, loading, disabled, variant = "primary",
 type InputProps = TextInputProps & {
   label?: string;
   hint?: string;
+  error?: string;
   right?: React.ReactNode;
+  left?: React.ReactNode;
   containerStyle?: ViewStyle;
+  size?: "sm" | "md" | "lg";
 };
 
-export function Input({ label, hint, style, multiline, right, containerStyle, ...props }: InputProps) {
+export function Input({ 
+  label, 
+  hint, 
+  error,
+  style, 
+  multiline, 
+  right, 
+  left,
+  containerStyle,
+  size = "md",
+  ...props 
+}: InputProps) {
+  const { width } = useWindowDimensions();
+  const isSmall = width <= 360;
+  
+  const sizeStyles = {
+    sm: { height: 44, fontSize: scaledFont(14, width) },
+    md: { height: 50, fontSize: scaledFont(15, width) },
+    lg: { height: 56, fontSize: scaledFont(16, width) },
+  };
+  
+  const currentSize = sizeStyles[size];
+
   return (
     <View style={[styles.inputBlock, containerStyle]}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
-      <View style={[styles.inputShell, multiline && styles.inputShellMultiline]}>
+      {label ? (
+        <Text style={[styles.label, { fontSize: scaledFont(13, width) }]}>{label}</Text>
+      ) : null}
+      <View style={[
+        styles.inputShell, 
+        { minHeight: multiline ? 100 : currentSize.height },
+        multiline && styles.inputShellMultiline,
+        error && styles.inputShellError
+      ]}>
+        {left ? <View style={styles.inputLeft}>{left}</View> : null}
         <TextInput
           placeholderTextColor={colors.textSoft}
           multiline={multiline}
           textAlignVertical={multiline ? "top" : "center"}
-          style={[styles.input, multiline && styles.inputMultiline, style]}
+          style={[
+            styles.input, 
+            { fontSize: currentSize.fontSize },
+            multiline && styles.inputMultiline, 
+            isSmall && { paddingHorizontal: spacing.md },
+            style
+          ]}
           {...props}
         />
         {right ? <View style={styles.inputRight}>{right}</View> : null}
       </View>
-      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      {error ? (
+        <Text style={[styles.errorText, { fontSize: scaledFont(12, width) }]}>{error}</Text>
+      ) : hint ? (
+        <Text style={[styles.hint, { fontSize: scaledFont(12, width) }]}>{hint}</Text>
+      ) : null}
     </View>
   );
 }
 
-export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+type CardProps = {
+  children: React.ReactNode;
+  style?: ViewStyle;
+  variant?: "default" | "elevated" | "outlined" | "tech";
+};
+
+export function Card({ children, style, variant = "default" }: CardProps) {
+  const variantStyles = {
+    default: styles.card,
+    elevated: [styles.card, styles.cardElevated],
+    outlined: [styles.card, styles.cardOutlined],
+    tech: [styles.card, styles.cardTech],
+  };
+
+  return (
+    <View style={[variantStyles[variant], style]}>
+      {children}
+    </View>
+  );
 }
 
 export function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+  const { width } = useWindowDimensions();
+  
   return (
     <View style={styles.sectionTitleBlock}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
+      <Text style={[styles.sectionTitle, { fontSize: scaledFont(18, width) }]}>{title}</Text>
+      {subtitle ? (
+        <Text style={[styles.sectionSubtitle, { fontSize: scaledFont(14, width) }]}>{subtitle}</Text>
+      ) : null}
     </View>
   );
 }
 
-export function Chip({ label, active, onPress }: { label: string; active?: boolean; onPress?: () => void }) {
+export function Chip({ 
+  label, 
+  active, 
+  onPress,
+  size = "md" 
+}: { 
+  label: string; 
+  active?: boolean; 
+  onPress?: () => void;
+  size?: "sm" | "md";
+}) {
+  const { width } = useWindowDimensions();
+  const isSmall = width <= 360;
+  
   return (
-    <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+    <Pressable 
+      onPress={onPress} 
+      style={[
+        styles.chip, 
+        active && styles.chipActive,
+        size === "sm" && styles.chipSmall,
+        isSmall && styles.chipCompact
+      ]}
+    >
+      <Text style={[
+        styles.chipText, 
+        active && styles.chipTextActive,
+        { fontSize: scaledFont(size === "sm" ? 12 : 13, width) }
+      ]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
 
-export function EmptyState({ icon = "—", title, description, action }: { icon?: string; title: string; description: string; action?: React.ReactNode }) {
+export function EmptyState({ 
+  icon = "—", 
+  title, 
+  description, 
+  action 
+}: { 
+  icon?: string; 
+  title: string; 
+  description: string; 
+  action?: React.ReactNode 
+}) {
+  const { width } = useWindowDimensions();
+  
   return (
     <Card style={styles.empty}>
       <View style={styles.emptyIconWrap}>
         <Text style={styles.emptyIcon}>{icon}</Text>
       </View>
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptyDescription}>{description}</Text>
-      {action ? <View style={{ marginTop: spacing.lg }}>{action}</View> : null}
+      <Text style={[styles.emptyTitle, { fontSize: scaledFont(18, width) }]}>{title}</Text>
+      <Text style={[styles.emptyDescription, { fontSize: scaledFont(14, width) }]}>{description}</Text>
+      {action ? <View style={{ marginTop: spacing.lg, width: "100%" }}>{action}</View> : null}
     </Card>
   );
 }
 
 export function LoadingState({ label }: { label: string }) {
+  const { width } = useWindowDimensions();
+  
   return (
     <View style={styles.loading}>
-      <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={styles.loadingText}>{label}</Text>
+      <View style={styles.loadingSpinner}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+      <Text style={[styles.loadingText, { fontSize: scaledFont(14, width) }]}>{label}</Text>
     </View>
   );
 }
 
-export function StatCard({ title, value, icon, tone = "blue", caption }: { title: string; value: number | string; icon?: string; tone?: "blue" | "green" | "orange" | "violet"; caption?: string }) {
+export function StatCard({ 
+  title, 
+  value, 
+  icon, 
+  tone = "blue", 
+  caption 
+}: { 
+  title: string; 
+  value: number | string; 
+  icon?: string; 
+  tone?: "blue" | "green" | "orange" | "violet"; 
+  caption?: string 
+}) {
+  const { width } = useWindowDimensions();
+  const isSmall = width <= 360;
+  
   const toneStyle =
-    tone === "green" ? styles.statIconGreen : tone === "orange" ? styles.statIconOrange : tone === "violet" ? styles.statIconViolet : styles.statIconBlue;
+    tone === "green" ? styles.statIconGreen 
+    : tone === "orange" ? styles.statIconOrange 
+    : tone === "violet" ? styles.statIconViolet 
+    : styles.statIconBlue;
 
   return (
-    <Card style={styles.statCard}>
+    <Card style={[styles.statCard, isSmall && styles.statCardCompact]}>
       <View style={styles.statTop}>
-        <View style={[styles.statIcon, toneStyle]}>
-          <Text style={styles.statIconText}>{icon || "•"}</Text>
+        <View style={[styles.statIcon, toneStyle, isSmall && styles.statIconSmall]}>
+          <Text style={[styles.statIconText, { fontSize: scaledFont(16, width) }]}>{icon || "•"}</Text>
         </View>
         <View style={styles.statBadge}>
-          <Text style={styles.statBadgeText}>Hoje</Text>
+          <Text style={[styles.statBadgeText, { fontSize: scaledFont(10, width) }]}>Hoje</Text>
         </View>
       </View>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statTitle}>{title}</Text>
-      {caption ? <Text style={styles.statCaption}>{caption}</Text> : null}
+      <Text style={[styles.statValue, { fontSize: scaledFont(isSmall ? 22 : 26, width) }]}>{value}</Text>
+      <Text style={[styles.statTitle, { fontSize: scaledFont(12, width) }]}>{title}</Text>
+      {caption ? (
+        <Text style={[styles.statCaption, { fontSize: scaledFont(11, width) }]}>{caption}</Text>
+      ) : null}
     </Card>
   );
 }
 
+// Componente de Divider
+export function Divider({ 
+  text, 
+  style 
+}: { 
+  text?: string; 
+  style?: ViewStyle 
+}) {
+  return (
+    <View style={[styles.dividerRow, style]}>
+      <View style={styles.divider} />
+      {text ? <Text style={styles.dividerText}>{text}</Text> : null}
+      {text ? <View style={styles.divider} /> : null}
+    </View>
+  );
+}
+
+// Componente de Badge
+export function Badge({ 
+  text, 
+  variant = "default" 
+}: { 
+  text: string; 
+  variant?: "default" | "success" | "warning" | "danger" | "tech" 
+}) {
+  const { width } = useWindowDimensions();
+  const variantStyles = {
+    default: { bg: colors.primarySoft, text: colors.primary },
+    success: { bg: colors.successSoft, text: colors.success },
+    warning: { bg: colors.warningSoft, text: colors.warning },
+    danger: { bg: colors.dangerSoft, text: colors.danger },
+    tech: { bg: "rgba(79,124,255,0.15)", text: "#60A5FA" },
+  };
+  
+  const current = variantStyles[variant];
+  
+  return (
+    <View style={[styles.badge, { backgroundColor: current.bg }]}>
+      <Text style={[styles.badgeText, { color: current.text, fontSize: scaledFont(11, width) }]}>{text}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  // Button styles
   button: {
-    height: 54,
     borderRadius: radius.lg,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: spacing.lg
+    flexDirection: "row",
+    gap: spacing.sm
   },
   button_primary: { backgroundColor: colors.primary, ...shadow.soft },
-  button_ai: { backgroundColor: colors.accent, ...shadow.glow },
-  button_secondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  button_ai: { 
+    backgroundColor: colors.accent, 
+    ...shadow.glow 
+  },
+  button_secondary: { 
+    backgroundColor: colors.surface, 
+    borderWidth: 1, 
+    borderColor: colors.border 
+  },
   button_ghost: { backgroundColor: "transparent" },
   button_danger: { backgroundColor: colors.danger },
-  buttonText: { fontFamily: fonts.bold, fontSize: 15 },
+  buttonText: { fontFamily: fonts.bold },
   buttonText_primary: { color: colors.white },
   buttonText_ai: { color: colors.white },
   buttonText_secondary: { color: colors.text },
   buttonText_ghost: { color: colors.primary },
   buttonText_danger: { color: colors.white },
 
+  // Card styles
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
@@ -162,11 +366,27 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     ...shadow.soft
   },
+  cardElevated: {
+    ...shadow.medium
+  },
+  cardOutlined: {
+    backgroundColor: "transparent",
+    borderWidth: 1.5
+  },
+  cardTech: {
+    backgroundColor: "rgba(17, 26, 46, 0.95)",
+    borderColor: "rgba(79, 124, 255, 0.2)",
+    ...shadow.glow
+  },
 
+  // Input styles
   inputBlock: { marginBottom: spacing.lg },
-  label: { color: colors.text, fontFamily: fonts.bold, fontSize: 13, marginBottom: spacing.sm },
+  label: { 
+    color: colors.text, 
+    fontFamily: fonts.bold, 
+    marginBottom: spacing.sm 
+  },
   inputShell: {
-    minHeight: 54,
     borderWidth: 1,
     borderColor: colors.borderStrong,
     borderRadius: radius.lg,
@@ -175,25 +395,49 @@ const styles = StyleSheet.create({
     alignItems: "center",
     overflow: "hidden"
   },
-  inputShellMultiline: { minHeight: 112, alignItems: "flex-start" },
+  inputShellMultiline: { alignItems: "flex-start" },
+  inputShellError: { borderColor: colors.danger },
   input: {
     flex: 1,
-    minHeight: 52,
     paddingHorizontal: spacing.lg,
     color: colors.text,
-    fontFamily: fonts.regular,
-    fontSize: 15
+    fontFamily: fonts.regular
   },
-  inputMultiline: { minHeight: 110, paddingTop: spacing.md, paddingBottom: spacing.md, lineHeight: 22 },
+  inputMultiline: { 
+    paddingTop: spacing.md, 
+    paddingBottom: spacing.md, 
+    lineHeight: 22,
+    minHeight: 96
+  },
+  inputLeft: { paddingLeft: spacing.md, alignSelf: "center" },
   inputRight: { paddingRight: spacing.md, alignSelf: "center" },
-  hint: { marginTop: spacing.xs, color: colors.textMuted, fontFamily: fonts.regular, fontSize: 12 },
+  hint: { 
+    marginTop: spacing.xs, 
+    color: colors.textMuted, 
+    fontFamily: fonts.regular 
+  },
+  errorText: {
+    marginTop: spacing.xs,
+    color: colors.danger,
+    fontFamily: fonts.medium
+  },
 
+  // Section title
   sectionTitleBlock: { marginBottom: spacing.md },
-  sectionTitle: { color: colors.text, fontFamily: fonts.title, fontSize: 20 },
-  sectionSubtitle: { color: colors.textMuted, fontFamily: fonts.regular, marginTop: spacing.xs, lineHeight: 20 },
+  sectionTitle: { 
+    color: colors.text, 
+    fontFamily: fonts.title 
+  },
+  sectionSubtitle: { 
+    color: colors.textMuted, 
+    fontFamily: fonts.regular, 
+    marginTop: spacing.xs, 
+    lineHeight: 20 
+  },
 
+  // Chip styles
   chip: {
-    height: 40,
+    height: 38,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.lg,
     backgroundColor: colors.surface,
@@ -202,38 +446,156 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.textMuted, fontFamily: fonts.bold, fontSize: 13 },
+  chipSmall: {
+    height: 32,
+    paddingHorizontal: spacing.md
+  },
+  chipCompact: {
+    paddingHorizontal: spacing.md
+  },
+  chipActive: { 
+    backgroundColor: colors.primary, 
+    borderColor: colors.primary 
+  },
+  chipText: { 
+    color: colors.textMuted, 
+    fontFamily: fonts.bold 
+  },
   chipTextActive: { color: colors.white },
 
-  empty: { alignItems: "center", padding: spacing.xl },
+  // Empty state
+  empty: { 
+    alignItems: "center", 
+    padding: spacing.xl 
+  },
   emptyIconWrap: {
-    width: 60,
-    height: 60,
-    borderRadius: 22,
+    width: 56,
+    height: 56,
+    borderRadius: 18,
     backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: spacing.md
   },
-  emptyIcon: { fontSize: 28 },
-  emptyTitle: { fontFamily: fonts.title, color: colors.text, fontSize: 20, textAlign: "center" },
-  emptyDescription: { fontFamily: fonts.regular, color: colors.textMuted, textAlign: "center", marginTop: spacing.sm, lineHeight: 21 },
+  emptyIcon: { fontSize: 24 },
+  emptyTitle: { 
+    fontFamily: fonts.title, 
+    color: colors.text, 
+    textAlign: "center" 
+  },
+  emptyDescription: { 
+    fontFamily: fonts.regular, 
+    color: colors.textMuted, 
+    textAlign: "center", 
+    marginTop: spacing.sm, 
+    lineHeight: 21 
+  },
 
-  loading: { alignItems: "center", justifyContent: "center", padding: spacing.xxl },
-  loadingText: { marginTop: spacing.md, color: colors.textMuted, fontFamily: fonts.medium },
+  // Loading state
+  loading: { 
+    alignItems: "center", 
+    justifyContent: "center", 
+    padding: spacing.xxl 
+  },
+  loadingSpinner: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.md
+  },
+  loadingText: { 
+    color: colors.textMuted, 
+    fontFamily: fonts.medium 
+  },
 
-  statCard: { flex: 1, minHeight: 120, padding: spacing.lg },
-  statTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.sm },
-  statIcon: { width: 42, height: 42, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  statIconText: { fontSize: 18 },
+  // Stat card
+  statCard: { 
+    flex: 1, 
+    minHeight: 110, 
+    padding: spacing.md 
+  },
+  statCardCompact: {
+    padding: spacing.sm,
+    minHeight: 100
+  },
+  statTop: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    justifyContent: "space-between", 
+    marginBottom: spacing.xs 
+  },
+  statIcon: { 
+    width: 38, 
+    height: 38, 
+    borderRadius: 12, 
+    alignItems: "center", 
+    justifyContent: "center" 
+  },
+  statIconSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 10
+  },
+  statIconText: { fontFamily: fonts.bold },
   statIconBlue: { backgroundColor: colors.primarySoft },
   statIconGreen: { backgroundColor: colors.successSoft },
   statIconOrange: { backgroundColor: colors.warningSoft },
   statIconViolet: { backgroundColor: colors.accentSoft },
-  statBadge: { backgroundColor: colors.surfaceMuted, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },
-  statBadgeText: { color: colors.textMuted, fontFamily: fonts.bold, fontSize: 10 },
-  statValue: { color: colors.text, fontFamily: fonts.title, fontSize: 26, marginTop: spacing.xs },
-  statTitle: { color: colors.textMuted, fontFamily: fonts.medium, fontSize: 13, marginTop: 2 },
-  statCaption: { color: colors.textSoft, fontFamily: fonts.regular, fontSize: 12, marginTop: spacing.xs }
+  statBadge: { 
+    backgroundColor: colors.surfaceMuted, 
+    borderRadius: radius.pill, 
+    paddingHorizontal: spacing.sm, 
+    paddingVertical: 2 
+  },
+  statBadgeText: { 
+    color: colors.textMuted, 
+    fontFamily: fonts.bold 
+  },
+  statValue: { 
+    color: colors.text, 
+    fontFamily: fonts.title, 
+    marginTop: spacing.xs 
+  },
+  statTitle: { 
+    color: colors.textMuted, 
+    fontFamily: fonts.medium, 
+    marginTop: 2 
+  },
+  statCaption: { 
+    color: colors.textSoft, 
+    fontFamily: fonts.regular, 
+    marginTop: spacing.xs 
+  },
+
+  // Divider
+  dividerRow: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    gap: spacing.md, 
+    marginVertical: spacing.lg 
+  },
+  divider: { 
+    flex: 1, 
+    height: 1, 
+    backgroundColor: colors.border 
+  },
+  dividerText: { 
+    color: colors.textMuted, 
+    fontFamily: fonts.medium,
+    fontSize: 13
+  },
+
+  // Badge
+  badge: {
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    alignSelf: "flex-start"
+  },
+  badgeText: {
+    fontFamily: fonts.bold
+  }
 });

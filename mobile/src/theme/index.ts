@@ -105,11 +105,11 @@ export const spacing = {
 };
 
 export const radius = {
-  sm: 10,
-  md: 14,
-  lg: 18,
-  xl: 24,
-  xxl: 32,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 28,
   pill: 999
 };
 
@@ -120,6 +120,35 @@ export const fonts = {
   bold: "Inter_700Bold",
   title: "Manrope_800ExtraBold"
 };
+
+// Sistema de tipografia responsiva (base 16px)
+export const typography = {
+  // Títulos
+  h1: { fontSize: 28, lineHeight: 34 },
+  h2: { fontSize: 22, lineHeight: 28 },
+  h3: { fontSize: 18, lineHeight: 24 },
+  h4: { fontSize: 16, lineHeight: 22 },
+  // Corpo
+  body: { fontSize: 15, lineHeight: 22 },
+  bodySmall: { fontSize: 13, lineHeight: 18 },
+  // Labels
+  label: { fontSize: 12, lineHeight: 16 },
+  caption: { fontSize: 11, lineHeight: 14 },
+};
+
+// Função para escalar fontes baseado na largura da tela
+export function scaledFont(baseFontSize: number, screenWidth: number): number {
+  const baseWidth = 375; // iPhone SE
+  const scale = Math.min(screenWidth / baseWidth, 1.3);
+  return Math.round(baseFontSize * Math.max(scale, 0.85));
+}
+
+// Função para escalar espaçamento
+export function scaledSpacing(baseSpacing: number, screenWidth: number): number {
+  const baseWidth = 375;
+  const scale = Math.min(screenWidth / baseWidth, 1.2);
+  return Math.round(baseSpacing * Math.max(scale, 0.9));
+}
 
 export const shadow = {
   none: {},
