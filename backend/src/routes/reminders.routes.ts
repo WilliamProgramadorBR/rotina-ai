@@ -2,52 +2,85 @@ import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 
+const reminderPrioritySchema = z.enum([
+  "LOW",
+  "NORMAL",
+  "HIGH",
+  "CRITICAL"
+]);
+
+const reminderStatusSchema = z.enum([
+  "ACTIVE",
+  "PAUSED",
+  "FINISHED",
+  "CANCELED"
+]);
+
+const reminderActionSchema = z.enum([
+  "DONE",
+  "SNOOZED",
+  "SKIPPED",
+  "MISSED"
+]);
+
+function normalizeLinks(links?: string[]) {
+  if (!links || links.length === 0) {
+    return undefined;
+  }
+
+  const cleanedLinks = links
+    .map((link) => link.trim())
+    .filter(Boolean);
+
+  if (cleanedLinks.length === 0) {
+    return undefined;
+  }
+
+  return JSON.stringify(cleanedLinks);
+}
 
 export async function remindersRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
 
+  app.get("/range", async (request) => {
+    const querySchema = z.object({
+      start: z.string().min(10),
+      end: z.string().min(10)
+    });
 
+    const userId = request.user.sub;
+    const { start, end } = querySchema.parse(request.query);
 
-  app.get("/range", async (request, reply) => {
-  const querySchema = z.object({
-    start: z.string().min(10),
-    end: z.string().min(10)
-  });
+    const startDate = new Date(`${start}T00:00:00`);
+    const endDate = new Date(`${end}T23:59:59`);
 
-  const userId = request.user.sub;
-  const { start, end } = querySchema.parse(request.query);
-
-  const startDate = new Date(`${start}T00:00:00`);
-  const endDate = new Date(`${end}T23:59:59`);
-
-  const reminders = await prisma.reminder.findMany({
-    where: {
-      schedule: {
-        userId
-      },
-      startAt: {
-        gte: startDate,
-        lte: endDate
-      }
-    },
-    include: {
-      schedule: true,
-      logs: {
-        orderBy: {
-          createdAt: "desc"
+    const reminders = await prisma.reminder.findMany({
+      where: {
+        schedule: {
+          userId
+        },
+        startAt: {
+          gte: startDate,
+          lte: endDate
         }
+      },
+      include: {
+        schedule: true,
+        logs: {
+          orderBy: {
+            createdAt: "desc"
+          }
+        }
+      },
+      orderBy: {
+        startAt: "asc"
       }
-    },
-    orderBy: {
-      startAt: "asc"
-    }
+    });
+
+    return {
+      reminders
+    };
   });
-
-  return {
-    reminders
-  };
-});
-
 
   app.get("/today", async (request) => {
     const userId = request.user.sub;
@@ -94,6 +127,12 @@ export async function remindersRoutes(app: FastifyInstance) {
       scheduleId: z.string(),
       title: z.string().min(2),
       description: z.string().optional(),
+
+      notes: z.string().optional(),
+      links: z.array(z.string()).optional(),
+      location: z.string().optional(),
+      priority: reminderPrioritySchema.optional(),
+
       startAt: z.string().datetime(),
       endAt: z.string().datetime().optional(),
       recurrenceRule: z.string().optional(),
@@ -121,10 +160,24 @@ export async function remindersRoutes(app: FastifyInstance) {
         scheduleId: data.scheduleId,
         title: data.title,
         description: data.description,
+
+        notes: data.notes,
+        linksJson: normalizeLinks(data.links),
+        location: data.location,
+        priority: data.priority || "NORMAL",
+
         startAt: new Date(data.startAt),
         endAt: data.endAt ? new Date(data.endAt) : undefined,
         recurrenceRule: data.recurrenceRule,
         timezone: data.timezone
+      },
+      include: {
+        schedule: true,
+        logs: {
+          orderBy: {
+            createdAt: "desc"
+          }
+        }
       }
     });
 
@@ -139,12 +192,7 @@ export async function remindersRoutes(app: FastifyInstance) {
     });
 
     const bodySchema = z.object({
-     action: z.enum([
-            "DONE",
-            "SNOOZED",
-            "SKIPPED",
-            "MISSED"
-            ]),
+      action: reminderActionSchema,
       note: z.string().optional()
     });
 
@@ -187,12 +235,7 @@ export async function remindersRoutes(app: FastifyInstance) {
     });
 
     const bodySchema = z.object({
-   status: z.enum([
-        "ACTIVE",
-        "PAUSED",
-        "FINISHED",
-        "CANCELED"
-        ])
+      status: reminderStatusSchema
     });
 
     const { id } = paramsSchema.parse(request.params);
@@ -220,6 +263,14 @@ export async function remindersRoutes(app: FastifyInstance) {
       },
       data: {
         status
+      },
+      include: {
+        schedule: true,
+        logs: {
+          orderBy: {
+            createdAt: "desc"
+          }
+        }
       }
     });
 
@@ -228,4 +279,3 @@ export async function remindersRoutes(app: FastifyInstance) {
     };
   });
 }
-

@@ -1,3 +1,6 @@
+
+
+
 import { ScheduleSuggestion, scheduleSuggestionSchema } from "./scheduleSuggestion.schema";
 
 function getTodayInSaoPaulo() {
@@ -93,14 +96,21 @@ Formato obrigatório:
 {
   "title": "string",
   "description": "string ou null",
-  "category": "HEALTH|STUDY|WORKOUT|WORK|SLEEP|WATER|PERSONAL|OTHER",
+  "notes": "string ou null",
+  "links": ["string"],
+  "extraInfo": "string ou null",
+  "category": "HEALTH",
   "sourceType": "AI_PROMPT",
-  "confidence": 0.0,
+  "confidence": 0.8,
   "warnings": ["string"],
   "reminders": [
     {
       "title": "string",
       "description": "string ou null",
+      "notes": "string ou null",
+      "links": ["string"],
+      "location": "string ou null",
+      "priority": "LOW | NORMAL | HIGH | CRITICAL",
       "date": "YYYY-MM-DD",
       "time": "HH:mm",
       "timezone": "America/Sao_Paulo"

@@ -1,70 +1,97 @@
-import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Reminder } from "../types/entities";
-import { colors, getCategoryMeta, radius, spacing } from "../theme";
-import { formatTime } from "../utils/date";
+import { colors, fonts, getCategoryMeta, getPriorityMeta, radius, shadow, spacing } from "../theme";
 
-function getLastAction(reminder: Reminder) {
-  return reminder.logs?.[0]?.action || null;
-}
+type ReminderLike = {
+  id: string;
+  title: string;
+  description?: string | null;
+  notes?: string | null;
+  startAt: string;
+  priority?: string | null;
+  location?: string | null;
+  schedule?: {
+    title?: string | null;
+    category?: string | null;
+  } | null;
+  logs?: Array<{ action: string }>;
+};
 
-function getActionMeta(action: string | null) {
-  if (action === "DONE") return { label: "Feito", color: colors.success, soft: colors.successSoft };
-  if (action === "SNOOZED") return { label: "Adiado", color: colors.warning, soft: colors.warningSoft };
-  if (action === "SKIPPED") return { label: "Pulado", color: colors.danger, soft: colors.dangerSoft };
-  if (action === "MISSED") return { label: "Perdido", color: colors.textMuted, soft: colors.surfaceMuted };
-  return { label: "Pendente", color: colors.primary, soft: colors.primarySoft };
-}
-
-export function ReminderCard({
-  reminder,
-  onDone,
-  onSnooze,
-  onSkip
-}: {
-  reminder: Reminder;
+type ReminderCardProps = {
+  reminder: ReminderLike;
   onDone?: () => void;
   onSnooze?: () => void;
   onSkip?: () => void;
-}) {
+};
+
+function formatTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--:--";
+  return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function hasAction(reminder: ReminderLike, action: string) {
+  return reminder.logs?.some((log) => log.action === action);
+}
+
+export function ReminderCard({ reminder, onDone, onSnooze, onSkip }: ReminderCardProps) {
   const category = getCategoryMeta(reminder.schedule?.category);
-  const action = getActionMeta(getLastAction(reminder));
+  const priority = getPriorityMeta(reminder.priority || "NORMAL");
+  const done = hasAction(reminder, "DONE");
+  const skipped = hasAction(reminder, "SKIPPED");
 
   return (
-    <View style={styles.card}>
-      <View style={styles.timeline}>
-        <View style={[styles.dot, { backgroundColor: category.color }]} />
-        <View style={styles.line} />
+    <View style={[styles.card, done && styles.cardDone]}>
+      <View style={styles.leftRail}>
+        <View style={[styles.timePill, { backgroundColor: category.background, borderColor: category.border }]}>
+          <Text style={[styles.timeText, { color: category.color }]}>{formatTime(reminder.startAt)}</Text>
+        </View>
+        <View style={[styles.timelineDot, { backgroundColor: category.color }]} />
+        <View style={styles.timelineLine} />
       </View>
 
       <View style={styles.content}>
-        <View style={styles.top}>
-          <View style={styles.timeBadge}><Text style={styles.timeText}>{formatTime(reminder.startAt)}</Text></View>
-          <View style={[styles.status, { backgroundColor: action.soft }]}>
-            <Text style={[styles.statusText, { color: action.color }]}>{action.label}</Text>
+        <View style={styles.headerRow}>
+          <View style={[styles.iconBox, { backgroundColor: category.background, borderColor: category.border }]}>
+            <Text style={[styles.iconText, { color: category.color }]}>{category.icon}</Text>
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title} numberOfLines={1}>{reminder.title}</Text>
+              <View style={[styles.categoryBadge, { backgroundColor: category.background }]}>
+                <Text style={[styles.categoryText, { color: category.color }]}>{category.label}</Text>
+              </View>
+            </View>
+
+            {reminder.description ? <Text style={styles.description} numberOfLines={2}>{reminder.description}</Text> : null}
+
+            <View style={styles.metaRow}>
+              <Text style={styles.metaText}>◷ 30 min</Text>
+              {reminder.schedule?.title ? <Text style={styles.metaText}>□ {reminder.schedule.title}</Text> : null}
+              {reminder.location ? <Text style={styles.metaText}>⌖ {reminder.location}</Text> : null}
+            </View>
+          </View>
+
+          <View style={[styles.priorityBadge, { backgroundColor: priority.background, borderColor: priority.border }]}>
+            <Text style={[styles.priorityText, { color: priority.color }]}>{priority.label}</Text>
           </View>
         </View>
 
-        <Text style={styles.title}>{reminder.title}</Text>
-        {reminder.description ? <Text style={styles.description} numberOfLines={3}>{reminder.description}</Text> : null}
-
-        <View style={styles.metaRow}>
-          <View style={[styles.category, { backgroundColor: category.soft }]}>
-            <Text style={styles.categoryIcon}>{category.icon}</Text>
-            <Text style={[styles.categoryText, { color: category.color }]}>{category.label}</Text>
+        {reminder.notes ? (
+          <View style={styles.notesBox}>
+            <Text style={styles.notesText}>{reminder.notes}</Text>
           </View>
-          {reminder.schedule?.title ? <Text style={styles.scheduleName} numberOfLines={1}>{reminder.schedule.title}</Text> : null}
-        </View>
+        ) : null}
 
         <View style={styles.actions}>
-          <Pressable style={[styles.actionButton, styles.done]} onPress={onDone}>
-            <Text style={[styles.actionText, { color: colors.success }]}>Feito</Text>
+          <Pressable disabled={done} onPress={onDone} style={[styles.actionButton, styles.doneButton, done && styles.actionDisabled]}>
+            <Text style={[styles.actionText, styles.doneText]}>{done ? "Concluído" : "Marcar como feito"}</Text>
           </Pressable>
-          <Pressable style={[styles.actionButton, styles.snooze]} onPress={onSnooze}>
-            <Text style={[styles.actionText, { color: colors.warning }]}>Adiar</Text>
+          <Pressable disabled={done || skipped} onPress={onSnooze} style={[styles.actionButton, styles.snoozeButton]}>
+            <Text style={[styles.actionText, styles.snoozeText]}>Adiar</Text>
           </Pressable>
-          <Pressable style={[styles.actionButton, styles.skip]} onPress={onSkip}>
-            <Text style={[styles.actionText, { color: colors.danger }]}>Pular</Text>
+          <Pressable disabled={done || skipped} onPress={onSkip} style={[styles.actionButton, styles.skipButton]}>
+            <Text style={[styles.actionText, styles.skipText]}>{skipped ? "Pulado" : "Pular"}</Text>
           </Pressable>
         </View>
       </View>
@@ -72,28 +99,48 @@ export function ReminderCard({
   );
 }
 
+export default ReminderCard;
+
 const styles = StyleSheet.create({
-  card: { flexDirection: "row", marginBottom: spacing.md },
-  timeline: { width: 26, alignItems: "center" },
-  dot: { width: 12, height: 12, borderRadius: 999, marginTop: 24 },
-  line: { flex: 1, width: 2, backgroundColor: colors.border, marginTop: 6 },
-  content: { flex: 1, backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg },
-  top: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, marginBottom: spacing.md },
-  timeBadge: { backgroundColor: colors.dark, borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
-  timeText: { color: colors.white, fontWeight: "900", fontSize: 13 },
-  status: { borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
-  statusText: { fontWeight: "900", fontSize: 12 },
-  title: { color: colors.text, fontSize: 18, fontWeight: "900", lineHeight: 24 },
-  description: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: spacing.sm },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.md },
-  category: { flexDirection: "row", alignItems: "center", gap: spacing.xs, borderRadius: 999, paddingVertical: spacing.xs, paddingHorizontal: spacing.sm },
-  categoryIcon: { fontSize: 13 },
-  categoryText: { fontWeight: "900", fontSize: 12 },
-  scheduleName: { flex: 1, color: colors.textSoft, fontWeight: "800", fontSize: 12 },
+  card: {
+    flexDirection: "row",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.xl,
+    marginBottom: spacing.md,
+    overflow: "hidden",
+    ...shadow.soft
+  },
+  cardDone: { opacity: 0.72 },
+  leftRail: { width: 104, alignItems: "center", paddingTop: spacing.lg },
+  timePill: { borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderWidth: 1 },
+  timeText: { fontFamily: fonts.bold, fontSize: 13 },
+  timelineDot: { width: 10, height: 10, borderRadius: 5, marginTop: spacing.md },
+  timelineLine: { width: 1, flex: 1, backgroundColor: colors.border, marginTop: spacing.xs },
+  content: { flex: 1, padding: spacing.lg, paddingLeft: 0 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  iconBox: { width: 58, height: 58, borderRadius: 20, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+  iconText: { fontFamily: fonts.title, fontSize: 24 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
+  title: { color: colors.text, fontFamily: fonts.title, fontSize: 18, maxWidth: "72%" },
+  description: { color: colors.textMuted, fontFamily: fonts.regular, lineHeight: 20, marginTop: 4 },
+  categoryBadge: { borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },
+  categoryText: { fontFamily: fonts.bold, fontSize: 12 },
+  metaRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md, marginTop: spacing.sm },
+  metaText: { color: colors.slate600 ?? colors.textMuted, fontFamily: fonts.medium, fontSize: 12 },
+  priorityBadge: { borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, alignSelf: "flex-start" },
+  priorityText: { fontFamily: fonts.bold, fontSize: 12 },
+  notesBox: { backgroundColor: colors.surfaceMuted, borderRadius: radius.lg, padding: spacing.md, marginTop: spacing.md },
+  notesText: { color: colors.textMuted, fontFamily: fonts.regular, lineHeight: 19 },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg },
-  actionButton: { flex: 1, minHeight: 42, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
-  done: { backgroundColor: colors.successSoft },
-  snooze: { backgroundColor: colors.warningSoft },
-  skip: { backgroundColor: colors.dangerSoft },
-  actionText: { fontWeight: "900", fontSize: 13 }
+  actionButton: { flex: 1, height: 42, borderRadius: radius.lg, alignItems: "center", justifyContent: "center" },
+  doneButton: { backgroundColor: colors.successSoft },
+  snoozeButton: { backgroundColor: colors.warningSoft },
+  skipButton: { backgroundColor: colors.dangerSoft },
+  actionText: { fontFamily: fonts.bold, fontSize: 13 },
+  doneText: { color: colors.success },
+  snoozeText: { color: colors.warning },
+  skipText: { color: colors.danger },
+  actionDisabled: { opacity: 0.6 }
 });

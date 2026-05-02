@@ -1,56 +1,168 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, spacing } from "../theme";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { colors, fonts, radius, spacing } from "../theme";
+import { useResponsive } from "../hooks/useResponsive";
+
+type PageHeaderProps = {
+  title: string;
+  subtitle?: string;
+  onMenu?: () => void;
+  right?: React.ReactNode;
+  searchPlaceholder?: string;
+};
 
 export function PageHeader({
   title,
   subtitle,
   onMenu,
-  right
-}: {
-  title: string;
-  subtitle?: string;
-  onMenu?: () => void;
-  right?: React.ReactNode;
-}) {
+  right,
+  searchPlaceholder
+}: PageHeaderProps) {
+  const { isPhone } = useResponsive();
+
   return (
-    <View style={styles.header}>
-      <View style={styles.left}>
-        {onMenu ? (
-          <Pressable style={styles.menuButton} onPress={onMenu}>
-            <Text style={styles.menuIcon}>☰</Text>
-          </Pressable>
-        ) : null}
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>{title}</Text>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+    <View style={styles.container}>
+      <View style={[styles.topRow, isPhone && styles.topRowPhone]}>
+        <View style={styles.leftSide}>
+          {onMenu ? (
+            <Pressable style={styles.menuButton} onPress={onMenu}>
+              <Text style={styles.menuText}>☰</Text>
+            </Pressable>
+          ) : null}
+
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text
+              style={[styles.title, isPhone && styles.titlePhone]}
+              numberOfLines={2}
+            >
+              {title}
+            </Text>
+
+            {subtitle ? (
+              <Text style={styles.subtitle} numberOfLines={2}>
+                {subtitle}
+              </Text>
+            ) : null}
+          </View>
         </View>
+
+        {right ? <View style={isPhone ? styles.rightPhone : styles.right}>{right}</View> : null}
       </View>
-      {right ? <View>{right}</View> : null}
+
+      {searchPlaceholder ? (
+        <View style={[styles.bottomRow, isPhone && styles.bottomRowPhone]}>
+          <View style={styles.searchBox}>
+            <Text style={styles.searchIcon}>⌕</Text>
+            <TextInput
+              placeholder={searchPlaceholder}
+              placeholderTextColor={colors.textSoft}
+              style={styles.searchInput}
+            />
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    marginBottom: spacing.xl
+  container: {
+    marginBottom: spacing.lg
   },
-  left: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.md },
+
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: spacing.md
+  },
+
+  topRowPhone: {
+    flexDirection: "column",
+    alignItems: "stretch"
+  },
+
+  leftSide: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    gap: spacing.md,
+    alignItems: "flex-start"
+  },
+
+  right: {
+    alignSelf: "flex-start"
+  },
+
+  rightPhone: {
+    width: "100%"
+  },
+
   menuButton: {
     width: 44,
     height: 44,
-    borderRadius: 14,
-    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center"
   },
-  menuIcon: { fontSize: 20, color: colors.text, fontWeight: "900" },
-  title: { color: colors.text, fontSize: 26, fontWeight: "900" },
-  subtitle: { color: colors.textMuted, fontSize: 14, fontWeight: "700", marginTop: 3, textTransform: "capitalize" }
+
+  menuText: {
+    fontSize: 18,
+    color: colors.text
+  },
+
+  title: {
+    color: colors.text,
+    fontFamily: fonts.title,
+    fontSize: 34,
+    lineHeight: 40
+  },
+
+  titlePhone: {
+    fontSize: 28,
+    lineHeight: 33
+  },
+
+  subtitle: {
+    marginTop: 4,
+    color: colors.textMuted,
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    lineHeight: 20
+  },
+
+  bottomRow: {
+    marginTop: spacing.md
+  },
+
+  bottomRowPhone: {
+    marginTop: spacing.md
+  },
+
+  searchBox: {
+    height: 52,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm
+  },
+
+  searchIcon: {
+    color: colors.textMuted,
+    fontSize: 16
+  },
+
+  searchInput: {
+    flex: 1,
+    color: colors.text,
+    fontFamily: fonts.regular,
+    fontSize: 15
+  }
 });

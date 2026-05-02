@@ -1,17 +1,25 @@
 import { z } from "zod";
 
 export const reminderSuggestionSchema = z.object({
-  title: z.string().min(1, "Título do lembrete é obrigatório."),
+  title: z.string().min(1),
   description: z.string().optional().nullable(),
-  date: z.string().min(10, "Data deve estar no formato YYYY-MM-DD."),
-  time: z.string().min(5, "Hora deve estar no formato HH:mm."),
+  notes: z.string().optional().nullable(),
+  links: z.array(z.string()).default([]),
+  location: z.string().optional().nullable(),
+  priority: z
+    .enum(["LOW", "NORMAL", "HIGH", "CRITICAL"])
+    .default("NORMAL"),
+  date: z.string().min(10),
+  time: z.string().min(5),
   timezone: z.string().default("America/Sao_Paulo")
 });
 
 export const scheduleSuggestionSchema = z.object({
-  title: z.string().min(1, "Título do cronograma é obrigatório."),
+  title: z.string().min(1),
   description: z.string().optional().nullable(),
-
+  notes: z.string().optional().nullable(),
+  links: z.array(z.string()).default([]),
+  extraInfo: z.string().optional().nullable(),
   category: z.enum([
     "HEALTH",
     "STUDY",
@@ -22,24 +30,15 @@ export const scheduleSuggestionSchema = z.object({
     "PERSONAL",
     "OTHER"
   ]),
-
-  sourceType: z.enum([
-    "AI_PROMPT"
-  ]).default("AI_PROMPT"),
-
+  sourceType: z.enum(["AI_PROMPT"]).default("AI_PROMPT"),
   confidence: z.number().min(0).max(1).default(0.7),
-
   warnings: z.array(z.string()).default([]),
-
-  reminders: z
-    .array(reminderSuggestionSchema)
-    .min(1, "A IA precisa gerar pelo menos um lembrete.")
-    .max(24, "A IA pode gerar no máximo 24 lembretes por vez.")
+  reminders: z.array(reminderSuggestionSchema).min(1).max(24)
 });
 
 export const aiSuggestRequestSchema = z.object({
-  prompt: z.string().min(5, "Prompt muito curto."),
-  startDate: z.string().min(10, "Data inicial obrigatória."),
+  prompt: z.string().min(5),
+  startDate: z.string().min(10),
   timezone: z.string().default("America/Sao_Paulo")
 });
 

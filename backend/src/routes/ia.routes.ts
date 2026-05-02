@@ -1,4 +1,5 @@
 import { FastifyInstance } from "fastify";
+import { ZodError } from "zod";
 import { prisma } from "../lib/prisma";
 import { generateScheduleSuggestion } from "../services/ai-provider.service";
 import {
@@ -11,15 +12,31 @@ function buildStartAt(date: string, time: string) {
   return new Date(`${date}T${time}:00`);
 }
 
+function normalizeLinks(links?: string[]) {
+  if (!links || links.length === 0) {
+    return undefined;
+  }
+
+  const cleanedLinks = links
+    .map((link) => link.trim())
+    .filter(Boolean);
+
+  if (cleanedLinks.length === 0) {
+    return undefined;
+  }
+
+  return JSON.stringify(cleanedLinks);
+}
+
 export async function iaRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
 
   app.post("/schedules/suggest", async (request, reply) => {
-    const { prompt, startDate, timezone } = aiSuggestRequestSchema.parse(
-      request.body
-    );
-
     try {
+      const { prompt, startDate, timezone } = aiSuggestRequestSchema.parse(
+        request.body
+      );
+
       const suggestion = await generateScheduleSuggestion({
         prompt,
         startDate,
@@ -28,22 +45,42 @@ export async function iaRoutes(app: FastifyInstance) {
 
       const parsedSuggestion = scheduleSuggestionSchema.parse(suggestion);
 
-      return {
+      console.log("[AI SUGGESTION OK]", {
+        title: parsedSuggestion.title,
+        category: parsedSuggestion.category,
+        reminders: parsedSuggestion.reminders.length,
+        hasNotes: Boolean(parsedSuggestion.notes),
+        hasExtraInfo: Boolean(parsedSuggestion.extraInfo)
+      });
+
+      return reply.status(200).send({
         suggestion: parsedSuggestion
-      };
+      });
     } catch (error: any) {
       request.log.error(error);
+
+      if (error instanceof ZodError) {
+        return reply.status(422).send({
+          message:
+            "A IA gerou uma estrutura inválida. O JSON veio, mas não bateu com o schema esperado.",
+          code: "AI_SCHEMA_VALIDATION_FAILED",
+          issues: error.issues
+        });
+      }
 
       const message = String(error?.message || "");
 
       if (
+        message.includes("Timeout ao chamar Ollama") ||
         message.includes("Ollama") ||
         message.includes("model requires more system memory") ||
-        message.includes("Unterminated string in JSON")
+        message.includes("JSON") ||
+        message.includes("Unexpected token") ||
+        message.includes("Unterminated string")
       ) {
         return reply.status(502).send({
           message:
-            "Não foi possível gerar o cronograma com a IA local. Verifique se o Ollama está rodando, se o modelo está correto e tente um prompt menor.",
+            "A IA local demorou demais ou não conseguiu gerar um JSON válido. Verifique se o Ollama está rodando e tente um prompt menor.",
           code: "OLLAMA_GENERATION_FAILED",
           detail: message
         });
@@ -58,37 +95,62 @@ export async function iaRoutes(app: FastifyInstance) {
   });
 
   app.post("/schedules/confirm", async (request, reply) => {
-    const userId = request.user.sub;
+    try {
+      const userId = request.user.sub;
 
-    const { suggestion } = aiConfirmRequestSchema.parse(request.body);
+      const { suggestion } = aiConfirmRequestSchema.parse(request.body);
 
-    const schedule = await prisma.schedule.create({
-      data: {
-        userId,
-        title: suggestion.title,
-        description: suggestion.description || undefined,
-        category: suggestion.category,
-        sourceType: "AI_PROMPT",
-        reminders: {
-          create: suggestion.reminders.map((reminder) => ({
-            title: reminder.title,
-            description: reminder.description || undefined,
-            startAt: buildStartAt(reminder.date, reminder.time),
-            timezone: reminder.timezone
-          }))
-        }
-      },
-      include: {
-        reminders: {
-          orderBy: {
-            startAt: "asc"
+      const schedule = await prisma.schedule.create({
+        data: {
+          userId,
+          title: suggestion.title,
+          description: suggestion.description || undefined,
+          notes: suggestion.notes || undefined,
+          linksJson: normalizeLinks(suggestion.links),
+          extraInfo: suggestion.extraInfo || undefined,
+          category: suggestion.category,
+          sourceType: "AI_PROMPT",
+          reminders: {
+            create: suggestion.reminders.map((reminder) => ({
+              title: reminder.title,
+              description: reminder.description || undefined,
+              notes: reminder.notes || undefined,
+              linksJson: normalizeLinks(reminder.links),
+              location: reminder.location || undefined,
+              priority: reminder.priority || "NORMAL",
+              startAt: buildStartAt(reminder.date, reminder.time),
+              timezone: reminder.timezone
+            }))
+          }
+        },
+        include: {
+          reminders: {
+            orderBy: {
+              startAt: "asc"
+            }
           }
         }
-      }
-    });
+      });
 
-    return reply.status(201).send({
-      schedule
-    });
+      return reply.status(201).send({
+        schedule
+      });
+    } catch (error: any) {
+      request.log.error(error);
+
+      if (error instanceof ZodError) {
+        return reply.status(422).send({
+          message: "Sugestão inválida para confirmação.",
+          code: "AI_CONFIRM_SCHEMA_VALIDATION_FAILED",
+          issues: error.issues
+        });
+      }
+
+      return reply.status(500).send({
+        message: "Não foi possível confirmar e salvar o cronograma.",
+        code: "AI_CONFIRM_FAILED",
+        detail: String(error?.message || "")
+      });
+    }
   });
 }

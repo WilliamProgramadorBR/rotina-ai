@@ -30,55 +30,61 @@ export async function schedulesRoutes(app: FastifyInstance) {
   });
 
   app.post("/", async (request, reply) => {
-    const bodySchema = z.object({
-      title: z.string().min(2),
-      description: z.string().optional(),
-      category: z
-        .enum([
-          "HEALTH",
-          "STUDY",
-          "WORKOUT",
-          "WORK",
-          "SLEEP",
-          "WATER",
-          "PERSONAL",
-          "OTHER"
-        ])
-        .optional(),
-      sourceType: z
-        .enum([
-          "MANUAL",
-          "AI_PROMPT",
-          "MEDICAL_IMAGE",
-          "IMPORTED_TEXT"
-        ])
-        .optional()
-    });
+  const bodySchema = z.object({
+    title: z.string().min(2),
+    description: z.string().optional(),
+    notes: z.string().optional(),
+    links: z.array(z.string()).optional(),
+    extraInfo: z.string().optional(),
+    category: z
+      .enum([
+        "HEALTH",
+        "STUDY",
+        "WORKOUT",
+        "WORK",
+        "SLEEP",
+        "WATER",
+        "PERSONAL",
+        "OTHER"
+      ])
+      .optional(),
+    sourceType: z
+      .enum([
+        "MANUAL",
+        "AI_PROMPT",
+        "MEDICAL_IMAGE",
+        "IMPORTED_TEXT"
+      ])
+      .optional()
+  });
 
-    const userId = request.user.sub;
-    const data = bodySchema.parse(request.body);
+  const userId = request.user.sub;
+  const data = bodySchema.parse(request.body);
 
-    const schedule = await prisma.schedule.create({
-      data: {
-        userId,
-        title: data.title,
-        description: data.description,
-        category: data.category || "OTHER",
-        sourceType: data.sourceType || "MANUAL"
-      },
-      include: {
-        reminders: {
-          orderBy: {
-            startAt: "asc"
-          }
+  const schedule = await prisma.schedule.create({
+    data: {
+      userId,
+      title: data.title,
+      description: data.description,
+      notes: data.notes,
+      linksJson: data.links ? JSON.stringify(data.links) : undefined,
+      extraInfo: data.extraInfo,
+      category: data.category || "OTHER",
+      sourceType: data.sourceType || "MANUAL"
+    },
+    include: {
+      reminders: {
+        orderBy: {
+          startAt: "asc"
         }
       }
-    });
-
-    return reply.status(201).send({
-      schedule
-    });
+    }
   });
+
+  return reply.status(201).send({
+    schedule
+  });
+});
 
   app.get("/:id", async (request, reply) => {
     const paramsSchema = z.object({
