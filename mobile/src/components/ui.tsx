@@ -10,7 +10,8 @@ import {
   ViewStyle,
   useWindowDimensions
 } from "react-native";
-import { colors, fonts, radius, shadow, spacing, typography, scaledFont } from "../theme";
+import { colors as defaultColors, fonts, radius, shadow, spacing, scaledFont } from "../theme";
+import { useTheme } from "../context/ThemeContext";
 
 type ButtonProps = {
   title: string;
@@ -34,6 +35,7 @@ export function Button({
   fullWidth = false
 }: ButtonProps) {
   const { width } = useWindowDimensions();
+  const { theme, isDark } = useTheme();
   const isDisabled = Boolean(disabled || loading);
   
   const sizeStyles = {
@@ -44,6 +46,26 @@ export function Button({
   
   const currentSize = sizeStyles[size];
 
+  const buttonStyles: Record<string, ViewStyle> = {
+    primary: { backgroundColor: theme.primary, ...shadow.soft },
+    ai: { backgroundColor: theme.accent, ...shadow.glow },
+    secondary: { 
+      backgroundColor: theme.surface, 
+      borderWidth: 1, 
+      borderColor: theme.border 
+    },
+    ghost: { backgroundColor: "transparent" },
+    danger: { backgroundColor: theme.danger }
+  };
+
+  const textColors: Record<string, string> = {
+    primary: theme.white,
+    ai: theme.white,
+    secondary: theme.text,
+    ghost: theme.primary,
+    danger: theme.white
+  };
+
   return (
     <Pressable
       onPress={onPress}
@@ -51,7 +73,7 @@ export function Button({
       style={({ pressed }) => [
         styles.button,
         { height: currentSize.height, paddingHorizontal: currentSize.paddingHorizontal },
-        styles[`button_${variant}`],
+        buttonStyles[variant],
         fullWidth && { width: "100%" },
         pressed && !isDisabled && { opacity: 0.88, transform: [{ scale: 0.99 }] },
         isDisabled && { opacity: 0.6 },
@@ -59,9 +81,9 @@ export function Button({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === "secondary" || variant === "ghost" ? colors.primary : colors.white} />
+        <ActivityIndicator color={textColors[variant]} />
       ) : (
-        <Text style={[styles.buttonText, styles[`buttonText_${variant}`], { fontSize: currentSize.fontSize }]}>
+        <Text style={[styles.buttonText, { color: textColors[variant], fontSize: currentSize.fontSize }]}>
           {title}
         </Text>
       )}
@@ -92,6 +114,7 @@ export function Input({
   ...props 
 }: InputProps) {
   const { width } = useWindowDimensions();
+  const { theme } = useTheme();
   const isSmall = width <= 360;
   
   const sizeStyles = {
@@ -105,22 +128,26 @@ export function Input({
   return (
     <View style={[styles.inputBlock, containerStyle]}>
       {label ? (
-        <Text style={[styles.label, { fontSize: scaledFont(13, width) }]}>{label}</Text>
+        <Text style={[styles.label, { color: theme.text, fontSize: scaledFont(13, width) }]}>{label}</Text>
       ) : null}
       <View style={[
         styles.inputShell, 
-        { minHeight: multiline ? 100 : currentSize.height },
+        { 
+          minHeight: multiline ? 100 : currentSize.height,
+          borderColor: theme.borderStrong,
+          backgroundColor: theme.surface
+        },
         multiline && styles.inputShellMultiline,
-        error && styles.inputShellError
+        error && { borderColor: theme.danger }
       ]}>
         {left ? <View style={styles.inputLeft}>{left}</View> : null}
         <TextInput
-          placeholderTextColor={colors.textSoft}
+          placeholderTextColor={theme.textSoft}
           multiline={multiline}
           textAlignVertical={multiline ? "top" : "center"}
           style={[
             styles.input, 
-            { fontSize: currentSize.fontSize },
+            { fontSize: currentSize.fontSize, color: theme.text },
             multiline && styles.inputMultiline, 
             isSmall && { paddingHorizontal: spacing.md },
             style
@@ -130,9 +157,9 @@ export function Input({
         {right ? <View style={styles.inputRight}>{right}</View> : null}
       </View>
       {error ? (
-        <Text style={[styles.errorText, { fontSize: scaledFont(12, width) }]}>{error}</Text>
+        <Text style={[styles.errorText, { color: theme.danger, fontSize: scaledFont(12, width) }]}>{error}</Text>
       ) : hint ? (
-        <Text style={[styles.hint, { fontSize: scaledFont(12, width) }]}>{hint}</Text>
+        <Text style={[styles.hint, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>{hint}</Text>
       ) : null}
     </View>
   );
@@ -145,15 +172,37 @@ type CardProps = {
 };
 
 export function Card({ children, style, variant = "default" }: CardProps) {
-  const variantStyles = {
-    default: styles.card,
-    elevated: [styles.card, styles.cardElevated],
-    outlined: [styles.card, styles.cardOutlined],
-    tech: [styles.card, styles.cardTech],
+  const { theme, isDark } = useTheme();
+  
+  const getVariantStyles = (): ViewStyle => {
+    const base: ViewStyle = {
+      backgroundColor: theme.surface,
+      borderRadius: radius.xl,
+      padding: spacing.lg,
+      borderWidth: 1,
+      borderColor: theme.border,
+      ...shadow.soft
+    };
+
+    switch (variant) {
+      case "elevated":
+        return { ...base, ...shadow.medium };
+      case "outlined":
+        return { ...base, backgroundColor: "transparent", borderWidth: 1.5 };
+      case "tech":
+        return { 
+          ...base, 
+          backgroundColor: isDark ? "rgba(17, 26, 46, 0.95)" : "rgba(241, 245, 249, 0.95)",
+          borderColor: isDark ? "rgba(79, 124, 255, 0.2)" : "rgba(37, 99, 235, 0.15)",
+          ...shadow.glow
+        };
+      default:
+        return base;
+    }
   };
 
   return (
-    <View style={[variantStyles[variant], style]}>
+    <View style={[getVariantStyles(), style]}>
       {children}
     </View>
   );
@@ -161,12 +210,13 @@ export function Card({ children, style, variant = "default" }: CardProps) {
 
 export function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   const { width } = useWindowDimensions();
+  const { theme } = useTheme();
   
   return (
     <View style={styles.sectionTitleBlock}>
-      <Text style={[styles.sectionTitle, { fontSize: scaledFont(18, width) }]}>{title}</Text>
+      <Text style={[styles.sectionTitle, { color: theme.text, fontSize: scaledFont(18, width) }]}>{title}</Text>
       {subtitle ? (
-        <Text style={[styles.sectionSubtitle, { fontSize: scaledFont(14, width) }]}>{subtitle}</Text>
+        <Text style={[styles.sectionSubtitle, { color: theme.textMuted, fontSize: scaledFont(14, width) }]}>{subtitle}</Text>
       ) : null}
     </View>
   );
@@ -184,6 +234,7 @@ export function Chip({
   size?: "sm" | "md";
 }) {
   const { width } = useWindowDimensions();
+  const { theme } = useTheme();
   const isSmall = width <= 360;
   
   return (
@@ -191,14 +242,16 @@ export function Chip({
       onPress={onPress} 
       style={[
         styles.chip, 
-        active && styles.chipActive,
+        { backgroundColor: theme.surface, borderColor: theme.border },
+        active && { backgroundColor: theme.primary, borderColor: theme.primary },
         size === "sm" && styles.chipSmall,
         isSmall && styles.chipCompact
       ]}
     >
       <Text style={[
         styles.chipText, 
-        active && styles.chipTextActive,
+        { color: theme.textMuted },
+        active && { color: theme.white },
         { fontSize: scaledFont(size === "sm" ? 12 : 13, width) }
       ]}>
         {label}
@@ -219,14 +272,15 @@ export function EmptyState({
   action?: React.ReactNode 
 }) {
   const { width } = useWindowDimensions();
+  const { theme } = useTheme();
   
   return (
     <Card style={styles.empty}>
-      <View style={styles.emptyIconWrap}>
+      <View style={[styles.emptyIconWrap, { backgroundColor: theme.primarySoft }]}>
         <Text style={styles.emptyIcon}>{icon}</Text>
       </View>
-      <Text style={[styles.emptyTitle, { fontSize: scaledFont(18, width) }]}>{title}</Text>
-      <Text style={[styles.emptyDescription, { fontSize: scaledFont(14, width) }]}>{description}</Text>
+      <Text style={[styles.emptyTitle, { color: theme.text, fontSize: scaledFont(18, width) }]}>{title}</Text>
+      <Text style={[styles.emptyDescription, { color: theme.textMuted, fontSize: scaledFont(14, width) }]}>{description}</Text>
       {action ? <View style={{ marginTop: spacing.lg, width: "100%" }}>{action}</View> : null}
     </Card>
   );
@@ -234,13 +288,14 @@ export function EmptyState({
 
 export function LoadingState({ label }: { label: string }) {
   const { width } = useWindowDimensions();
+  const { theme } = useTheme();
   
   return (
     <View style={styles.loading}>
-      <View style={styles.loadingSpinner}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={[styles.loadingSpinner, { backgroundColor: theme.primarySoft }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
-      <Text style={[styles.loadingText, { fontSize: scaledFont(14, width) }]}>{label}</Text>
+      <Text style={[styles.loadingText, { color: theme.textMuted, fontSize: scaledFont(14, width) }]}>{label}</Text>
     </View>
   );
 }
@@ -259,28 +314,30 @@ export function StatCard({
   caption?: string 
 }) {
   const { width } = useWindowDimensions();
+  const { theme } = useTheme();
   const isSmall = width <= 360;
   
-  const toneStyle =
-    tone === "green" ? styles.statIconGreen 
-    : tone === "orange" ? styles.statIconOrange 
-    : tone === "violet" ? styles.statIconViolet 
-    : styles.statIconBlue;
+  const toneColors = {
+    blue: theme.primarySoft,
+    green: theme.successSoft,
+    orange: theme.warningSoft,
+    violet: theme.accentSoft
+  };
 
   return (
     <Card style={[styles.statCard, isSmall && styles.statCardCompact]}>
       <View style={styles.statTop}>
-        <View style={[styles.statIcon, toneStyle, isSmall && styles.statIconSmall]}>
+        <View style={[styles.statIcon, { backgroundColor: toneColors[tone] }, isSmall && styles.statIconSmall]}>
           <Text style={[styles.statIconText, { fontSize: scaledFont(16, width) }]}>{icon || "•"}</Text>
         </View>
-        <View style={styles.statBadge}>
-          <Text style={[styles.statBadgeText, { fontSize: scaledFont(10, width) }]}>Hoje</Text>
+        <View style={[styles.statBadge, { backgroundColor: theme.surfaceMuted }]}>
+          <Text style={[styles.statBadgeText, { color: theme.textMuted, fontSize: scaledFont(10, width) }]}>Hoje</Text>
         </View>
       </View>
-      <Text style={[styles.statValue, { fontSize: scaledFont(isSmall ? 22 : 26, width) }]}>{value}</Text>
-      <Text style={[styles.statTitle, { fontSize: scaledFont(12, width) }]}>{title}</Text>
+      <Text style={[styles.statValue, { color: theme.text, fontSize: scaledFont(isSmall ? 22 : 26, width) }]}>{value}</Text>
+      <Text style={[styles.statTitle, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>{title}</Text>
       {caption ? (
-        <Text style={[styles.statCaption, { fontSize: scaledFont(11, width) }]}>{caption}</Text>
+        <Text style={[styles.statCaption, { color: theme.textSoft, fontSize: scaledFont(11, width) }]}>{caption}</Text>
       ) : null}
     </Card>
   );
@@ -294,11 +351,13 @@ export function Divider({
   text?: string; 
   style?: ViewStyle 
 }) {
+  const { theme } = useTheme();
+  
   return (
     <View style={[styles.dividerRow, style]}>
-      <View style={styles.divider} />
-      {text ? <Text style={styles.dividerText}>{text}</Text> : null}
-      {text ? <View style={styles.divider} /> : null}
+      <View style={[styles.divider, { backgroundColor: theme.border }]} />
+      {text ? <Text style={[styles.dividerText, { color: theme.textMuted }]}>{text}</Text> : null}
+      {text ? <View style={[styles.divider, { backgroundColor: theme.border }]} /> : null}
     </View>
   );
 }
@@ -312,12 +371,14 @@ export function Badge({
   variant?: "default" | "success" | "warning" | "danger" | "tech" 
 }) {
   const { width } = useWindowDimensions();
+  const { theme, isDark } = useTheme();
+  
   const variantStyles = {
-    default: { bg: colors.primarySoft, text: colors.primary },
-    success: { bg: colors.successSoft, text: colors.success },
-    warning: { bg: colors.warningSoft, text: colors.warning },
-    danger: { bg: colors.dangerSoft, text: colors.danger },
-    tech: { bg: "rgba(79,124,255,0.15)", text: "#60A5FA" },
+    default: { bg: theme.primarySoft, text: theme.primary },
+    success: { bg: theme.successSoft, text: theme.success },
+    warning: { bg: theme.warningSoft, text: theme.warning },
+    danger: { bg: theme.dangerSoft, text: theme.danger },
+    tech: { bg: isDark ? "rgba(79,124,255,0.15)" : "rgba(37,99,235,0.1)", text: isDark ? "#60A5FA" : "#2563EB" },
   };
   
   const current = variantStyles[variant];
@@ -325,6 +386,88 @@ export function Badge({
   return (
     <View style={[styles.badge, { backgroundColor: current.bg }]}>
       <Text style={[styles.badgeText, { color: current.text, fontSize: scaledFont(11, width) }]}>{text}</Text>
+    </View>
+  );
+}
+
+// Toggle de tema
+export function ThemeToggle({ showLabel = true }: { showLabel?: boolean }) {
+  const { width } = useWindowDimensions();
+  const { mode, isDark, theme, setMode } = useTheme();
+  
+  const getModeLabel = () => {
+    switch (mode) {
+      case "light": return "Claro";
+      case "dark": return "Escuro";
+      case "system": return "Sistema";
+    }
+  };
+
+  const getModeIcon = () => {
+    switch (mode) {
+      case "light": return "☀️";
+      case "dark": return "🌙";
+      case "system": return "⚙️";
+    }
+  };
+
+  const cycleMode = () => {
+    if (mode === "light") setMode("dark");
+    else if (mode === "dark") setMode("system");
+    else setMode("light");
+  };
+
+  return (
+    <Pressable 
+      onPress={cycleMode}
+      style={[
+        styles.themeToggle,
+        { backgroundColor: theme.surfaceMuted, borderColor: theme.border }
+      ]}
+    >
+      <Text style={styles.themeToggleIcon}>{getModeIcon()}</Text>
+      {showLabel && (
+        <Text style={[styles.themeToggleText, { color: theme.text, fontSize: scaledFont(14, width) }]}>
+          {getModeLabel()}
+        </Text>
+      )}
+    </Pressable>
+  );
+}
+
+// Selector de tema completo
+export function ThemeSelector() {
+  const { width } = useWindowDimensions();
+  const { mode, theme, setMode } = useTheme();
+  
+  const options: { value: "light" | "dark" | "system"; label: string; icon: string }[] = [
+    { value: "light", label: "Claro", icon: "☀️" },
+    { value: "dark", label: "Escuro", icon: "🌙" },
+    { value: "system", label: "Sistema", icon: "⚙️" }
+  ];
+
+  return (
+    <View style={styles.themeSelectorContainer}>
+      {options.map((option) => (
+        <Pressable
+          key={option.value}
+          onPress={() => setMode(option.value)}
+          style={[
+            styles.themeSelectorOption,
+            { backgroundColor: theme.surfaceMuted, borderColor: theme.border },
+            mode === option.value && { backgroundColor: theme.primarySoft, borderColor: theme.primary }
+          ]}
+        >
+          <Text style={styles.themeSelectorIcon}>{option.icon}</Text>
+          <Text style={[
+            styles.themeSelectorText, 
+            { color: theme.textMuted, fontSize: scaledFont(13, width) },
+            mode === option.value && { color: theme.primary }
+          ]}>
+            {option.label}
+          </Text>
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -338,69 +481,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.sm
   },
-  button_primary: { backgroundColor: colors.primary, ...shadow.soft },
-  button_ai: { 
-    backgroundColor: colors.accent, 
-    ...shadow.glow 
-  },
-  button_secondary: { 
-    backgroundColor: colors.surface, 
-    borderWidth: 1, 
-    borderColor: colors.border 
-  },
-  button_ghost: { backgroundColor: "transparent" },
-  button_danger: { backgroundColor: colors.danger },
   buttonText: { fontFamily: fonts.bold },
-  buttonText_primary: { color: colors.white },
-  buttonText_ai: { color: colors.white },
-  buttonText_secondary: { color: colors.text },
-  buttonText_ghost: { color: colors.primary },
-  buttonText_danger: { color: colors.white },
-
-  // Card styles
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadow.soft
-  },
-  cardElevated: {
-    ...shadow.medium
-  },
-  cardOutlined: {
-    backgroundColor: "transparent",
-    borderWidth: 1.5
-  },
-  cardTech: {
-    backgroundColor: "rgba(17, 26, 46, 0.95)",
-    borderColor: "rgba(79, 124, 255, 0.2)",
-    ...shadow.glow
-  },
 
   // Input styles
   inputBlock: { marginBottom: spacing.lg },
   label: { 
-    color: colors.text, 
     fontFamily: fonts.bold, 
     marginBottom: spacing.sm 
   },
   inputShell: {
     borderWidth: 1,
-    borderColor: colors.borderStrong,
     borderRadius: radius.lg,
-    backgroundColor: colors.white,
     flexDirection: "row",
     alignItems: "center",
     overflow: "hidden"
   },
   inputShellMultiline: { alignItems: "flex-start" },
-  inputShellError: { borderColor: colors.danger },
   input: {
     flex: 1,
     paddingHorizontal: spacing.lg,
-    color: colors.text,
     fontFamily: fonts.regular
   },
   inputMultiline: { 
@@ -413,23 +512,19 @@ const styles = StyleSheet.create({
   inputRight: { paddingRight: spacing.md, alignSelf: "center" },
   hint: { 
     marginTop: spacing.xs, 
-    color: colors.textMuted, 
     fontFamily: fonts.regular 
   },
   errorText: {
     marginTop: spacing.xs,
-    color: colors.danger,
     fontFamily: fonts.medium
   },
 
   // Section title
   sectionTitleBlock: { marginBottom: spacing.md },
   sectionTitle: { 
-    color: colors.text, 
     fontFamily: fonts.title 
   },
   sectionSubtitle: { 
-    color: colors.textMuted, 
     fontFamily: fonts.regular, 
     marginTop: spacing.xs, 
     lineHeight: 20 
@@ -440,9 +535,7 @@ const styles = StyleSheet.create({
     height: 38,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.lg,
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -453,15 +546,9 @@ const styles = StyleSheet.create({
   chipCompact: {
     paddingHorizontal: spacing.md
   },
-  chipActive: { 
-    backgroundColor: colors.primary, 
-    borderColor: colors.primary 
-  },
   chipText: { 
-    color: colors.textMuted, 
     fontFamily: fonts.bold 
   },
-  chipTextActive: { color: colors.white },
 
   // Empty state
   empty: { 
@@ -472,7 +559,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 18,
-    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: spacing.md
@@ -480,12 +566,10 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 24 },
   emptyTitle: { 
     fontFamily: fonts.title, 
-    color: colors.text, 
     textAlign: "center" 
   },
   emptyDescription: { 
     fontFamily: fonts.regular, 
-    color: colors.textMuted, 
     textAlign: "center", 
     marginTop: spacing.sm, 
     lineHeight: 21 
@@ -501,13 +585,11 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 20,
-    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: spacing.md
   },
   loadingText: { 
-    color: colors.textMuted, 
     fontFamily: fonts.medium 
   },
 
@@ -540,32 +622,23 @@ const styles = StyleSheet.create({
     borderRadius: 10
   },
   statIconText: { fontFamily: fonts.bold },
-  statIconBlue: { backgroundColor: colors.primarySoft },
-  statIconGreen: { backgroundColor: colors.successSoft },
-  statIconOrange: { backgroundColor: colors.warningSoft },
-  statIconViolet: { backgroundColor: colors.accentSoft },
   statBadge: { 
-    backgroundColor: colors.surfaceMuted, 
     borderRadius: radius.pill, 
     paddingHorizontal: spacing.sm, 
     paddingVertical: 2 
   },
   statBadgeText: { 
-    color: colors.textMuted, 
     fontFamily: fonts.bold 
   },
   statValue: { 
-    color: colors.text, 
     fontFamily: fonts.title, 
     marginTop: spacing.xs 
   },
   statTitle: { 
-    color: colors.textMuted, 
     fontFamily: fonts.medium, 
     marginTop: 2 
   },
   statCaption: { 
-    color: colors.textSoft, 
     fontFamily: fonts.regular, 
     marginTop: spacing.xs 
   },
@@ -579,11 +652,9 @@ const styles = StyleSheet.create({
   },
   divider: { 
     flex: 1, 
-    height: 1, 
-    backgroundColor: colors.border 
+    height: 1 
   },
   dividerText: { 
-    color: colors.textMuted, 
     fontFamily: fonts.medium,
     fontSize: 13
   },
@@ -596,6 +667,45 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start"
   },
   badgeText: {
+    fontFamily: fonts.bold
+  },
+
+  // Theme toggle
+  themeToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1
+  },
+  themeToggleIcon: {
+    fontSize: 18
+  },
+  themeToggleText: {
+    fontFamily: fonts.medium
+  },
+
+  // Theme selector
+  themeSelectorContainer: {
+    flexDirection: "row",
+    gap: spacing.sm
+  },
+  themeSelectorOption: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1.5
+  },
+  themeSelectorIcon: {
+    fontSize: 16
+  },
+  themeSelectorText: {
     fontFamily: fonts.bold
   }
 });

@@ -13,8 +13,10 @@ import {
 } from "react-native";
 import { router, usePathname } from "expo-router";
 import { useAuth } from "../context/AuthContext";
-import { colors, fonts, radius, spacing, scaledFont } from "../theme";
+import { useTheme } from "../context/ThemeContext";
+import { fonts, radius, spacing, scaledFont } from "../theme";
 import { useResponsive } from "../hooks/useResponsive";
+import { ThemeToggle } from "./ui";
 
 type ScreenLayoutProps = {
   scroll?: boolean;
@@ -48,6 +50,7 @@ function MobileDrawer({
   children: ReactNode;
 }) {
   const { width } = useWindowDimensions();
+  const { isDark } = useTheme();
   
   // Largura do drawer: 84% da tela, max 320px
   const drawerWidth = Math.min(width * 0.84, 320);
@@ -71,7 +74,13 @@ function MobileDrawer({
         />
         
         {/* Drawer */}
-        <View style={[drawerStyles.drawer, { width: drawerWidth }]}>
+        <View style={[
+          drawerStyles.drawer, 
+          { 
+            width: drawerWidth,
+            backgroundColor: isDark ? "#070B16" : "#0B1220"
+          }
+        ]}>
           <SafeAreaView style={drawerStyles.safeArea}>
             {children}
           </SafeAreaView>
@@ -87,6 +96,23 @@ function Sidebar({ onClose, isMobile = false }: { onClose?: () => void; isMobile
   const user = auth.user;
   const { width } = useWindowDimensions();
   const { isSmallPhone } = useResponsive();
+  const { theme, isDark } = useTheme();
+
+  // Cores do sidebar (sempre escuro para manter consistencia)
+  const sidebarColors = {
+    bg: isDark ? "#070B16" : "#0B1220",
+    surface: isDark ? "#0F1629" : "#182033",
+    border: isDark ? "#1F2937" : "#293246",
+    textPrimary: "#FFFFFF",
+    textSecondary: "#AAB4C8",
+    textMuted: "#7D8AA6",
+    activeItemBg: "rgba(79, 124, 255, 0.15)",
+    tipBg: isDark ? "#0F2554" : "#122B5C",
+    tipBorder: isDark ? "#1E4080" : "#254A88",
+    logoutBg: isDark ? "#1F1520" : "#2A1626",
+    logoutBorder: isDark ? "#3D2838" : "#4B2640",
+    logoutText: "#FDA4AF"
+  };
 
   async function handleLogout() {
     try {
@@ -107,18 +133,22 @@ function Sidebar({ onClose, isMobile = false }: { onClose?: () => void; isMobile
   const labelSize = isSmallPhone ? 9 : scaledFont(10, width);
 
   return (
-    <View style={[sidebarStyles.container, isMobile && sidebarStyles.containerMobile]}>
+    <View style={[
+      sidebarStyles.container, 
+      isMobile && sidebarStyles.containerMobile,
+      { backgroundColor: sidebarColors.bg }
+    ]}>
       {/* Header com marca e botao fechar */}
       <View style={sidebarStyles.header}>
         <View style={sidebarStyles.brandRow}>
-          <View style={sidebarStyles.logo}>
+          <View style={[sidebarStyles.logo, { backgroundColor: theme.primary }]}>
             <Text style={sidebarStyles.logoText}>R</Text>
           </View>
           <View style={sidebarStyles.brandInfo}>
-            <Text style={[sidebarStyles.brandTitle, { fontSize: brandTitleSize }]}>
+            <Text style={[sidebarStyles.brandTitle, { fontSize: brandTitleSize, color: sidebarColors.textPrimary }]}>
               Rotina AI
             </Text>
-            <Text style={[sidebarStyles.brandSubtitle, { fontSize: brandSubtitleSize }]}>
+            <Text style={[sidebarStyles.brandSubtitle, { fontSize: brandSubtitleSize, color: sidebarColors.textSecondary }]}>
               Sua rotina inteligente
             </Text>
           </View>
@@ -139,24 +169,32 @@ function Sidebar({ onClose, isMobile = false }: { onClose?: () => void; isMobile
       </View>
 
       {/* Card do usuario */}
-      <View style={sidebarStyles.userCard}>
+      <View style={[
+        sidebarStyles.userCard, 
+        { backgroundColor: sidebarColors.surface, borderColor: sidebarColors.border }
+      ]}>
         <View style={sidebarStyles.avatar}>
-          <Text style={sidebarStyles.avatarText}>
+          <Text style={[sidebarStyles.avatarText, { color: theme.text }]}>
             {(user?.name || "U").slice(0, 1).toUpperCase()}
           </Text>
         </View>
         <View style={sidebarStyles.userInfo}>
-          <Text style={sidebarStyles.userName} numberOfLines={1}>
+          <Text style={[sidebarStyles.userName, { color: sidebarColors.textPrimary }]} numberOfLines={1}>
             {user?.name || "Usuário"}
           </Text>
-          <Text style={sidebarStyles.userEmail} numberOfLines={1}>
+          <Text style={[sidebarStyles.userEmail, { color: sidebarColors.textSecondary }]} numberOfLines={1}>
             {user?.email || "email@exemplo.com"}
           </Text>
         </View>
       </View>
 
+      {/* Theme Toggle */}
+      <View style={sidebarStyles.themeToggleWrapper}>
+        <ThemeToggle showLabel />
+      </View>
+
       {/* Menu label */}
-      <Text style={[sidebarStyles.menuLabel, { fontSize: labelSize }]}>Menu</Text>
+      <Text style={[sidebarStyles.menuLabel, { fontSize: labelSize, color: sidebarColors.textMuted }]}>Menu</Text>
 
       {/* Menu items */}
       <ScrollView 
@@ -173,18 +211,28 @@ function Sidebar({ onClose, isMobile = false }: { onClose?: () => void; isMobile
                 onClose?.();
                 router.push(item.route as any);
               }}
-              style={[sidebarStyles.menuItem, active && sidebarStyles.menuItemActive]}
+              style={[
+                sidebarStyles.menuItem, 
+                active && { backgroundColor: sidebarColors.activeItemBg }
+              ]}
               accessible
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
             >
-              <View style={[sidebarStyles.menuItemIcon, active && sidebarStyles.menuItemIconActive]}>
-                <Text style={[sidebarStyles.menuItemIconText, active && sidebarStyles.menuItemIconTextActive]}>
+              <View style={[
+                sidebarStyles.menuItemIcon, 
+                active && { backgroundColor: theme.primary }
+              ]}>
+                <Text style={[
+                  sidebarStyles.menuItemIconText, 
+                  { color: sidebarColors.textSecondary },
+                  active && { color: "#fff" }
+                ]}>
                   {item.icon}
                 </Text>
               </View>
               <Text 
-                style={[sidebarStyles.menuItemText, { fontSize: menuItemSize }]}
+                style={[sidebarStyles.menuItemText, { fontSize: menuItemSize, color: sidebarColors.textPrimary }]}
                 numberOfLines={1}
               >
                 {item.label}
@@ -196,20 +244,26 @@ function Sidebar({ onClose, isMobile = false }: { onClose?: () => void; isMobile
 
       {/* Footer */}
       <View style={sidebarStyles.footer}>
-        <View style={sidebarStyles.tipCard}>
-          <Text style={sidebarStyles.tipTitle}>Dica inteligente</Text>
+        <View style={[
+          sidebarStyles.tipCard, 
+          { backgroundColor: sidebarColors.tipBg, borderColor: sidebarColors.tipBorder }
+        ]}>
+          <Text style={[sidebarStyles.tipTitle, { color: sidebarColors.textPrimary }]}>Dica inteligente</Text>
           <Text style={sidebarStyles.tipText}>
             Transforme uma rotina escrita em alarmes usando IA.
           </Text>
         </View>
 
         <Pressable 
-          style={sidebarStyles.logoutButton} 
+          style={[
+            sidebarStyles.logoutButton,
+            { backgroundColor: sidebarColors.logoutBg, borderColor: sidebarColors.logoutBorder }
+          ]} 
           onPress={handleLogout}
           accessible
           accessibilityRole="button"
         >
-          <Text style={sidebarStyles.logoutText}>Sair da conta</Text>
+          <Text style={[sidebarStyles.logoutText, { color: sidebarColors.logoutText }]}>Sair da conta</Text>
         </Pressable>
       </View>
     </View>
@@ -219,6 +273,7 @@ function Sidebar({ onClose, isMobile = false }: { onClose?: () => void; isMobile
 export function ScreenLayout({ children, scroll = true }: ScreenLayoutProps) {
   const { isPhone, isPhoneLarge, isTablet, isDesktop, paddingHorizontal, paddingVertical, isSmallPhone } = useResponsive();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { theme, isDark } = useTheme();
 
   const openMenu = () => setMenuOpen(true);
   const closeMenu = () => setMenuOpen(false);
@@ -240,8 +295,11 @@ export function ScreenLayout({ children, scroll = true }: ScreenLayoutProps) {
   });
 
   return (
-    <SafeAreaView style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#0B1220" />
+    <SafeAreaView style={[styles.root, { backgroundColor: theme.background }]}>
+      <StatusBar 
+        barStyle={isDark ? "light-content" : "dark-content"} 
+        backgroundColor={theme.background} 
+      />
       
       {/* Desktop sidebar */}
       {isDesktop && <Sidebar />}
@@ -291,7 +349,6 @@ const drawerStyles = StyleSheet.create({
   },
   drawer: {
     height: "100%",
-    backgroundColor: "#0B1220",
     // Sombra para dar profundidade
     ...Platform.select({
       ios: {
@@ -314,7 +371,6 @@ const sidebarStyles = StyleSheet.create({
   container: {
     flex: 1,
     width: 260,
-    backgroundColor: "#0B1220",
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md
@@ -343,7 +399,6 @@ const sidebarStyles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 14,
-    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -353,11 +408,9 @@ const sidebarStyles = StyleSheet.create({
     fontSize: 18
   },
   brandTitle: {
-    color: "#fff",
     fontFamily: fonts.title
   },
   brandSubtitle: {
-    color: "#AAB4C8",
     fontFamily: fonts.medium
   },
   closeButton: {
@@ -381,10 +434,8 @@ const sidebarStyles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.md,
     borderRadius: radius.lg,
-    backgroundColor: "#182033",
     borderWidth: 1,
-    borderColor: "#293246",
-    marginBottom: spacing.xl
+    marginBottom: spacing.lg
   },
   avatar: {
     width: 40,
@@ -395,7 +446,6 @@ const sidebarStyles = StyleSheet.create({
     justifyContent: "center"
   },
   avatarText: {
-    color: colors.text,
     fontFamily: fonts.title,
     fontSize: 16
   },
@@ -404,17 +454,17 @@ const sidebarStyles = StyleSheet.create({
     minWidth: 0
   },
   userName: {
-    color: "#fff",
     fontFamily: fonts.bold,
     fontSize: 14
   },
   userEmail: {
-    color: "#AAB4C8",
     fontFamily: fonts.regular,
     fontSize: 12
   },
+  themeToggleWrapper: {
+    marginBottom: spacing.lg
+  },
   menuLabel: {
-    color: "#7D8AA6",
     fontFamily: fonts.bold,
     textTransform: "uppercase",
     letterSpacing: 1,
@@ -436,9 +486,6 @@ const sidebarStyles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.md
   },
-  menuItemActive: {
-    backgroundColor: "rgba(79, 124, 255, 0.15)"
-  },
   menuItemIcon: {
     width: 36,
     height: 36,
@@ -447,19 +494,11 @@ const sidebarStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  menuItemIconActive: {
-    backgroundColor: colors.primary
-  },
   menuItemIconText: {
-    color: "#AAB4C8",
     fontFamily: fonts.bold,
     fontSize: 12
   },
-  menuItemIconTextActive: {
-    color: "#fff"
-  },
   menuItemText: {
-    color: "#fff",
     fontFamily: fonts.medium,
     flex: 1
   },
@@ -467,15 +506,12 @@ const sidebarStyles = StyleSheet.create({
     marginTop: spacing.md
   },
   tipCard: {
-    backgroundColor: "#122B5C",
     borderWidth: 1,
-    borderColor: "#254A88",
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.md
   },
   tipTitle: {
-    color: "#fff",
     fontFamily: fonts.bold,
     fontSize: 13,
     marginBottom: spacing.xs
@@ -489,14 +525,11 @@ const sidebarStyles = StyleSheet.create({
   logoutButton: {
     minHeight: 48,
     borderRadius: radius.md,
-    backgroundColor: "#2A1626",
     borderWidth: 1,
-    borderColor: "#4B2640",
     alignItems: "center",
     justifyContent: "center"
   },
   logoutText: {
-    color: "#FDA4AF",
     fontFamily: fonts.bold,
     fontSize: 14
   }
@@ -505,7 +538,6 @@ const sidebarStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.background,
     flexDirection: "row"
   },
   content: {
