@@ -22,6 +22,15 @@ export type Schedule = {
   category: ScheduleCategory;
   sourceType?: "MANUAL" | "AI_PROMPT" | "MEDICAL_IMAGE" | "IMPORTED_TEXT";
   reminders?: Reminder[];
+  progress?: {
+    total: number;
+    done: number;
+    skipped: number;
+    missed: number;
+    snoozed: number;
+    pending: number;
+    completionRate: number;
+  };
 };
 
 export type Reminder = {

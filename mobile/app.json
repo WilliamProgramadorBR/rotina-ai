@@ -2,8 +2,10 @@
   "expo": {
     "name": "Rotina AI",
     "slug": "rotina-ai",
+    "description": "Gerenciador de rotinas inteligente desenvolvido por WilliamProgramadorBR.",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "scheme": "rotinaai",
     "userInterfaceStyle": "automatic",
     "android": {
@@ -15,16 +17,34 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/rotina_alarm.wav"
+          ]
+        }
+      ],
       "expo-dev-client",
       "expo-font"
     ],
     "extra": {
+      "creator": {
+        "name": "WilliamProgramadorBR",
+        "expoOwner": "williamdevbackend"
+      },
       "router": {},
       "eas": {
         "projectId": "cc180b55-d92b-4ffa-b03b-742c60a91e7c"
       }
     },
-    "owner": "williamdevbackend"
+    "owner": "williamdevbackend",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/cc180b55-d92b-4ffa-b03b-742c60a91e7c"
+    },
+    "ios": {}
   }
 }

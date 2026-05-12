@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
+import { withScheduleProgress } from "../services/metrics.service";
 
 export async function schedulesRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
@@ -14,6 +15,13 @@ export async function schedulesRoutes(app: FastifyInstance) {
       },
       include: {
         reminders: {
+          include: {
+            logs: {
+              orderBy: {
+                createdAt: "desc"
+              }
+            }
+          },
           orderBy: {
             startAt: "asc"
           }
@@ -25,7 +33,7 @@ export async function schedulesRoutes(app: FastifyInstance) {
     });
 
     return {
-      schedules
+      schedules: schedules.map(withScheduleProgress)
     };
   });
 
@@ -74,6 +82,13 @@ export async function schedulesRoutes(app: FastifyInstance) {
     },
     include: {
       reminders: {
+        include: {
+          logs: {
+            orderBy: {
+              createdAt: "desc"
+            }
+          }
+        },
         orderBy: {
           startAt: "asc"
         }
@@ -81,8 +96,8 @@ export async function schedulesRoutes(app: FastifyInstance) {
     }
   });
 
-  return reply.status(201).send({
-    schedule
+    return reply.status(201).send({
+    schedule: withScheduleProgress(schedule)
   });
 });
 
@@ -101,6 +116,13 @@ export async function schedulesRoutes(app: FastifyInstance) {
       },
       include: {
         reminders: {
+          include: {
+            logs: {
+              orderBy: {
+                createdAt: "desc"
+              }
+            }
+          },
           orderBy: {
             startAt: "asc"
           }
@@ -115,7 +137,7 @@ export async function schedulesRoutes(app: FastifyInstance) {
     }
 
     return {
-      schedule
+      schedule: withScheduleProgress(schedule)
     };
   });
 

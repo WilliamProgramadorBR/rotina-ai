@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
 import { router, useFocusEffect } from "expo-router";
 import { api } from "../src/services/api";
+import { getDashboardMetricsRequest } from "../src/services/metrics";
 import { useAuth } from "../src/context/AuthContext";
+import { DashboardMetrics } from "../src/types/api";
 import { colors, fonts, radius, shadow, spacing, scaledFont } from "../src/theme";
 import { formatLongDate, getPeriodFromDate } from "../src/utils/date";
 import { Button, EmptyState, LoadingState, StatCard } from "../src/components/ui";
@@ -40,6 +42,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { width, isPhone, isSmallPhone, isPhoneLarge, gap, paddingHorizontal } = useResponsive();
   const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [dashboardSummary, setDashboardSummary] = useState<DashboardMetrics["summary"] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<"ALL" | "PENDING" | "DONE">("ALL");
 
@@ -51,6 +54,13 @@ export default function HomeScreen() {
       if (!silent) setIsLoading(true);
       const response = await api.get("/reminders/today");
       setReminders(response.data.reminders || []);
+
+      try {
+        const metrics = await getDashboardMetricsRequest();
+        setDashboardSummary(metrics.summary);
+      } catch (metricsError: any) {
+        console.log("[HOME METRICS ERROR]", metricsError?.response?.data || metricsError);
+      }
     } catch (error: any) {
       console.log("[HOME ERROR]", error?.response?.data || error);
       Alert.alert("Erro", error?.response?.data?.message || "Nao foi possivel carregar os lembretes.");
@@ -145,7 +155,7 @@ export default function HomeScreen() {
               <StatCard title="Feitos" value={doneCount} icon="V" tone="green" caption="Concluidos" />
             </View>
             <View style={[styles.statItem, isSmallPhone && styles.statItemSmall]}>
-              <StatCard title="Sequencia" value="7" icon="S" tone="violet" caption="dias" />
+              <StatCard title="Sequencia" value={dashboardSummary?.streakDays || 0} icon="S" tone="violet" caption="dias 100%" />
             </View>
           </View>
 
@@ -191,6 +201,19 @@ export default function HomeScreen() {
               <View style={styles.quickTextBox}>
                 <Text style={[styles.quickTitle, { fontSize: scaledFont(14, width) }]}>Ver cronogramas</Text>
                 <Text style={[styles.quickSubtitle, { fontSize: scaledFont(12, width) }]}>Gerenciar rotinas</Text>
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={[styles.quickCard, isMobileLayout && styles.quickCardMobile]}
+              onPress={() => router.push("/dashboard")}
+            >
+              <View style={styles.quickIcon}>
+                <Text style={styles.quickIconText}>D</Text>
+              </View>
+              <View style={styles.quickTextBox}>
+                <Text style={[styles.quickTitle, { fontSize: scaledFont(14, width) }]}>Dashboard</Text>
+                <Text style={[styles.quickSubtitle, { fontSize: scaledFont(12, width) }]}>Ver metricas reais</Text>
               </View>
             </Pressable>
 

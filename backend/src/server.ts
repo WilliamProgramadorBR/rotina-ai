@@ -7,6 +7,7 @@ import { authRoutes } from "./routes/auth.routes";
 import { schedulesRoutes } from "./routes/schedules.routes";
 import { remindersRoutes } from "./routes/reminders.routes";
 import { iaRoutes } from "./routes/ia.routes";
+import { metricsRoutes } from "./routes/metrics.routes";
 const app = Fastify({
   logger: true
 });
@@ -50,6 +51,10 @@ app.register(schedulesRoutes, {
 
 app.register(remindersRoutes, {
   prefix: "/reminders"
+});
+
+app.register(metricsRoutes, {
+  prefix: "/metrics"
 });
 
 app.listen({ port: PORT, host: "0.0.0.0" }).then(() => {

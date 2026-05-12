@@ -2,6 +2,7 @@
   "name": "rotina-ai-mobile",
   "version": "0.1.0",
   "private": true,
+  "author": "WilliamProgramadorBR",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
@@ -23,6 +24,7 @@
     "expo-router": "latest",
     "expo-secure-store": "latest",
     "expo-status-bar": "latest",
+    "expo-updates": "~55.0.21",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-native": "0.83.6",

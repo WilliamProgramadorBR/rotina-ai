@@ -35,6 +35,17 @@ export type Schedule = {
   createdAt: string;
   updatedAt: string;
   reminders?: Reminder[];
+  progress?: ScheduleProgress;
+};
+
+export type ScheduleProgress = {
+  total: number;
+  done: number;
+  skipped: number;
+  missed: number;
+  snoozed: number;
+  pending: number;
+  completionRate: number;
 };
 
 export type ReminderLog = {
@@ -60,4 +71,49 @@ export type Reminder = {
   updatedAt: string;
   schedule?: Schedule;
   logs?: ReminderLog[];
+};
+
+export type DashboardMetrics = {
+  summary: {
+    totalSchedules: number;
+    activeSchedules: number;
+    totalReminders: number;
+    dueReminders: number;
+    doneReminders: number;
+    pendingReminders: number;
+    skippedReminders: number;
+    missedReminders: number;
+    snoozedReminders: number;
+    completionRate: number;
+    routineProgressRate: number;
+    aiSchedules: number;
+    aiAdoptionRate: number;
+    streakDays: number;
+    bestCategory: string | null;
+  };
+  weekly: Array<{
+    date: string;
+    label: string;
+    total: number;
+    done: number;
+    skipped: number;
+    missed: number;
+    completionRate: number;
+  }>;
+  categories: Array<{
+    category: ScheduleCategory;
+    label: string;
+    schedules: number;
+    reminders: number;
+    done: number;
+    completionRate: number;
+  }>;
+  priorities: Array<{
+    priority: string;
+    label: string;
+    total: number;
+    done: number;
+    completionRate: number;
+  }>;
+  insights: string[];
 };

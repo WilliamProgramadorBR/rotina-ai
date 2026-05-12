@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 
 const items = [
   { label: "Hoje", icon: "🏠", path: "/home" },
+  { label: "Dashboard", icon: "D", path: "/dashboard" },
   { label: "Cronogramas", icon: "📋", path: "/schedules" },
   { label: "Criar com IA", icon: "✨", path: "/ai-prompt" },
   { label: "Novo cronograma", icon: "➕", path: "/schedules/new" },

@@ -73,7 +73,7 @@ export default function ScheduleDetailScreen() {
           ) : (
             <>
               <View style={styles.hero}>
-                <View style={[styles.iconBox, { backgroundColor: meta.soft }]}><Text style={styles.icon}>{meta.icon}</Text></View>
+                <View style={[styles.iconBox, { backgroundColor: meta.background }]}><Text style={styles.icon}>{meta.icon}</Text></View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.title}>{schedule.title}</Text>
                   <Text style={styles.category}>{meta.label}</Text>
@@ -83,7 +83,8 @@ export default function ScheduleDetailScreen() {
 
               <View style={styles.stats}>
                 <StatCard title="Lembretes" value={reminders.length} icon="🔔" />
-                <StatCard title="Categoria" value={meta.label} icon={meta.icon} tone="purple" />
+                <StatCard title="Progresso" value={`${schedule.progress?.completionRate ?? 0}%`} icon="%" tone="green" />
+                <StatCard title="Categoria" value={meta.label} icon={meta.icon} tone="violet" />
               </View>
 
               <View style={styles.actionRow}>

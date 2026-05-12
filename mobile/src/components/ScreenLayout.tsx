@@ -2,7 +2,6 @@ import React, { ReactNode, useState } from "react";
 import {
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +10,7 @@ import {
   Platform,
   StatusBar
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, usePathname } from "expo-router";
 import { useAuth } from "../context/AuthContext";
 import { colors, fonts, radius, spacing, scaledFont } from "../theme";
@@ -31,6 +31,7 @@ type ScreenLayoutProps = {
 
 const menuItems = [
   { label: "Hoje", icon: "H", route: "/home" },
+  { label: "Dashboard", icon: "D", route: "/dashboard" },
   { label: "Cronogramas", icon: "C", route: "/schedules" },
   { label: "Criar com IA", icon: "AI", route: "/ai-prompt" },
   { label: "Novo cronograma", icon: "+", route: "/schedules/new" },
@@ -72,7 +73,10 @@ function MobileDrawer({
         
         {/* Drawer */}
         <View style={[drawerStyles.drawer, { width: drawerWidth }]}>
-          <SafeAreaView style={drawerStyles.safeArea}>
+          <SafeAreaView
+            style={drawerStyles.safeArea}
+            edges={["top", "bottom", "left"]}
+          >
             {children}
           </SafeAreaView>
         </View>
@@ -218,6 +222,7 @@ function Sidebar({ onClose, isMobile = false }: { onClose?: () => void; isMobile
 
 export function ScreenLayout({ children, scroll = true }: ScreenLayoutProps) {
   const { isPhone, isPhoneLarge, isTablet, isDesktop, paddingHorizontal, paddingVertical, isSmallPhone } = useResponsive();
+  const insets = useSafeAreaInsets();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const openMenu = () => setMenuOpen(true);
@@ -228,6 +233,9 @@ export function ScreenLayout({ children, scroll = true }: ScreenLayoutProps) {
 
   // Padding responsivo - maior em telas maiores
   const contentPaddingH = isSmallPhone ? 12 : isPhone ? 16 : paddingHorizontal;
+  const statusBarHeight = Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0;
+  const topSafePadding = Math.max(insets.top, statusBarHeight);
+  const bottomSafePadding = Math.max(insets.bottom, spacing.md);
 
   const content = children({
     openMenu,
@@ -240,7 +248,7 @@ export function ScreenLayout({ children, scroll = true }: ScreenLayoutProps) {
   });
 
   return (
-    <SafeAreaView style={styles.root}>
+    <SafeAreaView style={styles.root} edges={["left", "right"]}>
       <StatusBar barStyle="light-content" backgroundColor="#0B1220" />
       
       {/* Desktop sidebar */}
@@ -263,15 +271,24 @@ export function ScreenLayout({ children, scroll = true }: ScreenLayoutProps) {
               styles.scrollContent,
               {
                 paddingHorizontal: contentPaddingH,
-                paddingTop: paddingVertical,
-                paddingBottom: spacing.xxxl + 20
+                paddingTop: topSafePadding + paddingVertical,
+                paddingBottom: bottomSafePadding + spacing.xxxl
               }
             ]}
           >
             {content}
           </ScrollView>
         ) : (
-          <View style={[styles.noScrollContent, { paddingHorizontal: contentPaddingH }]}>
+          <View
+            style={[
+              styles.noScrollContent,
+              {
+                paddingHorizontal: contentPaddingH,
+                paddingTop: topSafePadding + paddingVertical,
+                paddingBottom: bottomSafePadding
+              }
+            ]}
+          >
             {content}
           </View>
         )}

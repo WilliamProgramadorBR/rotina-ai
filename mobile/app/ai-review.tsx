@@ -82,7 +82,7 @@ for (const reminder of createdSchedule.reminders || []) {
           />
 
           <View style={styles.hero}>
-            <View style={[styles.iconBox, { backgroundColor: meta.soft }]}><Text style={styles.icon}>{meta.icon}</Text></View>
+            <View style={[styles.iconBox, { backgroundColor: meta.background }]}><Text style={styles.icon}>{meta.icon}</Text></View>
             <View style={{ flex: 1 }}>
               <Text style={styles.title}>{suggestion.title}</Text>
               <Text style={styles.category}>{meta.label}</Text>
@@ -92,7 +92,7 @@ for (const reminder of createdSchedule.reminders || []) {
 
           <View style={styles.stats}>
             <StatCard title="Alarmes" value={suggestion.reminders.length} icon="🔔" />
-            <StatCard title="Confiança" value={`${Math.round((suggestion.confidence || 0.7) * 100)}%`} icon="🧠" tone="purple" />
+            <StatCard title="Confiança" value={`${Math.round((suggestion.confidence || 0.7) * 100)}%`} icon="🧠" tone="violet" />
           </View>
 
           {suggestion.warnings?.length ? (

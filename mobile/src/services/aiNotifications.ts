@@ -29,7 +29,10 @@ export async function scheduleLocalNotificationForReminder(reminder: ReminderLik
         data: { reminderId: reminder.id },
         sound: true
       },
-      trigger: date
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date
+      }
     });
   } catch (error) {
     console.log("[NOTIFICATION] Erro ao agendar:", error);

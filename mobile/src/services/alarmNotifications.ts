@@ -1,7 +1,8 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 
-export const ALARM_CHANNEL_ID = "rotina_ai_alarm_channel";
+export const ALARM_SOUND_FILE_NAME = "rotina_alarm.wav";
+export const ALARM_CHANNEL_ID = "rotina_ai_alarm_channel_v2";
 export const ALARM_CATEGORY_ID = "rotina_ai_alarm_category";
 
 export type AlarmNotificationPayload = {
@@ -17,7 +18,8 @@ Notifications.setNotificationHandler({
     shouldPlaySound: true,
     shouldSetBadge: false,
     shouldShowBanner: true,
-    shouldShowList: true
+    shouldShowList: true,
+    priority: Notifications.AndroidNotificationPriority.MAX
   })
 });
 
@@ -26,10 +28,18 @@ export async function configureAlarmNotifications() {
     await Notifications.setNotificationChannelAsync(ALARM_CHANNEL_ID, {
       name: "Alarmes da rotina",
       importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 350, 250, 350],
+      vibrationPattern: [0, 700, 250, 700, 250, 1100],
       lightColor: "#2563EB",
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-      sound: "default"
+      sound: ALARM_SOUND_FILE_NAME,
+      bypassDnd: true,
+      enableLights: true,
+      enableVibrate: true,
+      showBadge: true,
+      audioAttributes: {
+        usage: Notifications.AndroidAudioUsage.ALARM,
+        contentType: Notifications.AndroidAudioContentType.SONIFICATION
+      }
     });
   }
 
@@ -105,9 +115,13 @@ export async function scheduleReminderAlarm(payload: AlarmNotificationPayload) {
     content: {
       title: `⏰ ${payload.title}`,
       body: payload.description || payload.scheduleTitle || "Você tem um lembrete agora.",
-      sound: "default",
+      sound: ALARM_SOUND_FILE_NAME,
       priority: Notifications.AndroidNotificationPriority.MAX,
       categoryIdentifier: ALARM_CATEGORY_ID,
+      sticky: true,
+      autoDismiss: false,
+      vibrate: [0, 700, 250, 700, 250, 1100],
+      color: "#2563EB",
       data: {
         type: "REMINDER_ALARM",
         reminderId: payload.reminderId,
@@ -148,9 +162,13 @@ export async function scheduleSnoozeAlarm(payload: AlarmNotificationPayload, min
     content: {
       title: `😴 Soneca: ${payload.title}`,
       body: `Adiado por ${minutes} minutos.`,
-      sound: "default",
+      sound: ALARM_SOUND_FILE_NAME,
       priority: Notifications.AndroidNotificationPriority.MAX,
       categoryIdentifier: ALARM_CATEGORY_ID,
+      sticky: true,
+      autoDismiss: false,
+      vibrate: [0, 700, 250, 700, 250, 1100],
+      color: "#2563EB",
       data: {
         type: "REMINDER_ALARM",
         reminderId: payload.reminderId,

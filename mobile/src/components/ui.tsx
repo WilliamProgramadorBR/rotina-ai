@@ -2,6 +2,7 @@ import React from "react";
 import {
   ActivityIndicator,
   Pressable,
+  StyleProp,
   StyleSheet,
   Text,
   TextInput,
@@ -19,7 +20,7 @@ type ButtonProps = {
   disabled?: boolean;
   variant?: "primary" | "secondary" | "ghost" | "danger" | "ai";
   size?: "sm" | "md" | "lg";
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   fullWidth?: boolean;
 };
 
@@ -75,7 +76,7 @@ type InputProps = TextInputProps & {
   error?: string;
   right?: React.ReactNode;
   left?: React.ReactNode;
-  containerStyle?: ViewStyle;
+  containerStyle?: StyleProp<ViewStyle>;
   size?: "sm" | "md" | "lg";
 };
 
@@ -140,7 +141,7 @@ export function Input({
 
 type CardProps = {
   children: React.ReactNode;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   variant?: "default" | "elevated" | "outlined" | "tech";
 };
 
@@ -292,7 +293,7 @@ export function Divider({
   style 
 }: { 
   text?: string; 
-  style?: ViewStyle 
+  style?: StyleProp<ViewStyle>
 }) {
   return (
     <View style={[styles.dividerRow, style]}>

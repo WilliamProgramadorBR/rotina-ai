@@ -71,17 +71,18 @@ export async function iaRoutes(app: FastifyInstance) {
       const message = String(error?.message || "");
 
       if (
-        message.includes("Timeout ao chamar Ollama") ||
-        message.includes("Ollama") ||
-        message.includes("model requires more system memory") ||
+        message.includes("Timeout ao chamar Gemini") ||
+        message.includes("Erro ao chamar Gemini") ||
+        message.includes("Gemini") ||
         message.includes("JSON") ||
         message.includes("Unexpected token") ||
-        message.includes("Unterminated string")
+        message.includes("Unterminated string") ||
+        message.includes("A IA não retornou conteúdo")
       ) {
         return reply.status(502).send({
           message:
-            "A IA local demorou demais ou não conseguiu gerar um JSON válido. Verifique se o Ollama está rodando e tente um prompt menor.",
-          code: "OLLAMA_GENERATION_FAILED",
+            "A IA não conseguiu gerar uma sugestão válida no momento. Tente novamente com um pedido mais objetivo.",
+          code: "GEMINI_GENERATION_FAILED",
           detail: message
         });
       }

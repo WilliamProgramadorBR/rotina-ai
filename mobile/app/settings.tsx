@@ -1,15 +1,29 @@
+import { useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
-import { Button, Card, SectionTitle } from "../src/components/ui";
+import { Button, Card, Input, SectionTitle } from "../src/components/ui";
 import { PageHeader } from "../src/components/PageHeader";
 import { ScreenLayout } from "../src/components/ScreenLayout";
 import { colors, fonts, radius, shadow, spacing, scaledFont } from "../src/theme";
 import { configureAlarmNotifications, requestAlarmNotificationPermission, scheduleReminderAlarm } from "../src/services/alarmNotifications";
 import { useResponsive } from "../src/hooks/useResponsive";
+import { getApiBaseUrl, getDefaultApiBaseUrl, resetApiBaseUrl, saveApiBaseUrl } from "../src/services/api";
+import { getDashboardMetricsRequest } from "../src/services/metrics";
+import { DashboardMetrics } from "../src/types/api";
 
 export default function SettingsScreen() {
   const { width, isPhone, isSmallPhone, gap } = useResponsive();
   const isMobile = isPhone || isSmallPhone;
+  const [apiUrl, setApiUrl] = useState(getDefaultApiBaseUrl());
+  const [isSavingApiUrl, setIsSavingApiUrl] = useState(false);
+  const [dashboardSummary, setDashboardSummary] = useState<DashboardMetrics["summary"] | null>(null);
+
+  useEffect(() => {
+    getApiBaseUrl().then(setApiUrl);
+    getDashboardMetricsRequest()
+      .then((metrics) => setDashboardSummary(metrics.summary))
+      .catch((error) => console.log("[SETTINGS METRICS ERROR]", error?.response?.data || error));
+  }, []);
 
   async function handleTestAlarm() {
     try {
@@ -34,6 +48,32 @@ export default function SettingsScreen() {
     } catch (error: any) {
       console.log("[TEST ALARM ERROR]", error);
       Alert.alert("Erro", error?.message || "Nao foi possivel testar o alarme.");
+    }
+  }
+
+  async function handleSaveApiUrl() {
+    try {
+      setIsSavingApiUrl(true);
+      const savedUrl = await saveApiBaseUrl(apiUrl);
+      setApiUrl(savedUrl);
+      Alert.alert("URL salva", "As proximas chamadas usarao este servidor.");
+    } catch (error: any) {
+      Alert.alert("URL invalida", error?.message || "Nao foi possivel salvar a URL da API.");
+    } finally {
+      setIsSavingApiUrl(false);
+    }
+  }
+
+  async function handleResetApiUrl() {
+    try {
+      setIsSavingApiUrl(true);
+      const defaultUrl = await resetApiBaseUrl();
+      setApiUrl(defaultUrl);
+      Alert.alert("URL restaurada", "O app voltou a usar a URL padrao.");
+    } catch (error: any) {
+      Alert.alert("Erro", error?.message || "Nao foi possivel restaurar a URL padrao.");
+    } finally {
+      setIsSavingApiUrl(false);
     }
   }
 
@@ -145,7 +185,7 @@ export default function SettingsScreen() {
                 <Metric label="Canal ativo" value="Local notifications" tone="green" width={width} isMobile={isMobile} />
                 <Metric label="Ultimo teste" value="Aguardando validacao" tone="blue" width={width} isMobile={isMobile} />
                 <Metric label="Permissoes" value="Verificar no Android" tone="orange" width={width} isMobile={isMobile} />
-                <Metric label="Taxa de entrega" value="100% em testes locais" tone="green" width={width} isMobile={isMobile} />
+                <Metric label="Conclusao geral" value={`${dashboardSummary?.completionRate ?? 0}% dos vencidos`} tone="green" width={width} isMobile={isMobile} />
               </Card>
 
               {/* Help Card */}
@@ -164,6 +204,61 @@ export default function SettingsScreen() {
                   size={isMobile ? "md" : "lg"}
                   fullWidth
                 />
+              </Card>
+
+              {/* API Connection Card */}
+              <Card style={[styles.apiCard, isMobile && styles.apiCardMobile]}>
+                <SectionTitle
+                  title="Conexao da API"
+                  subtitle="Troque a URL do backend sem instalar um novo APK."
+                />
+                <Input
+                  label="URL do servidor"
+                  value={apiUrl}
+                  onChangeText={setApiUrl}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  size={isMobile ? "sm" : "md"}
+                  hint={`Padrao: ${getDefaultApiBaseUrl()}`}
+                />
+                <View style={[styles.apiActions, isMobile && styles.apiActionsMobile]}>
+                  <Button
+                    title="Salvar URL"
+                    variant="ai"
+                    onPress={handleSaveApiUrl}
+                    loading={isSavingApiUrl}
+                    style={styles.apiActionButton}
+                    size={isMobile ? "md" : "lg"}
+                  />
+                  <Button
+                    title="Usar padrao"
+                    variant="secondary"
+                    onPress={handleResetApiUrl}
+                    disabled={isSavingApiUrl}
+                    style={styles.apiActionButton}
+                    size={isMobile ? "md" : "lg"}
+                  />
+                </View>
+              </Card>
+
+              {/* Credits Card */}
+              <Card style={[styles.creditsCard, isMobile && styles.creditsCardMobile]}>
+                <Text style={[styles.creditsTitle, { fontSize: scaledFont(isMobile ? 16 : 18, width) }]}>
+                  Sobre o App
+                </Text>
+                <Text style={[styles.creditsText, { fontSize: scaledFont(13, width) }]}>
+                  Rotina AI - Gerenciador de Rotinas Inteligente
+                </Text>
+                <Text style={[styles.creditsText, { fontSize: scaledFont(12, width) }]}>
+                  Criador: WilliamProgramadorBR
+                </Text>
+                <Text style={[styles.creditsText, { fontSize: scaledFont(12, width) }]}>
+                  Conta Expo: williamdevbackend
+                </Text>
+                <Text style={[styles.creditsText, { fontSize: scaledFont(12, width) }]}>
+                  Versao 1.0.0
+                </Text>
               </Card>
             </View>
           </View>
@@ -441,9 +536,43 @@ const styles = StyleSheet.create({
     fontFamily: fonts.title 
   },
   helpText: { 
-    color: colors.textMuted, 
-    fontFamily: fonts.regular, 
-    lineHeight: 20, 
+    color: colors.textMuted,
+    fontFamily: fonts.regular,
+    lineHeight: 20,
     marginTop: spacing.sm 
+  },
+
+  apiCard: {
+    padding: spacing.lg
+  },
+  apiCardMobile: {
+    padding: spacing.md
+  },
+  apiActions: {
+    flexDirection: "row",
+    gap: spacing.sm
+  },
+  apiActionsMobile: {
+    flexDirection: "column"
+  },
+  apiActionButton: {
+    flex: 1
+  },
+
+  creditsCard: {
+    padding: spacing.lg
+  },
+  creditsCardMobile: {
+    padding: spacing.md
+  },
+  creditsTitle: {
+    color: colors.text,
+    fontFamily: fonts.title
+  },
+  creditsText: {
+    color: colors.textMuted,
+    fontFamily: fonts.regular,
+    lineHeight: 20,
+    marginTop: spacing.sm
   }
 });

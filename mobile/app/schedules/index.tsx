@@ -16,6 +16,11 @@ type Schedule = {
   category?: string | null;
   sourceType?: string | null;
   reminders?: Array<{ id: string; startAt?: string }>;
+  progress?: {
+    total: number;
+    done: number;
+    completionRate: number;
+  };
 };
 
 const filters = [

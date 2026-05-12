@@ -1,21 +1,18 @@
-import type { ScheduleSuggestion } from "./scheduleSuggestion.schema";
-import { generateScheduleSuggestionWithOllama } from "./ollama.service";
+import { ScheduleSuggestion } from "./scheduleSuggestion.schema";
 import { generateScheduleSuggestionWithGemini } from "./gemini.service";
 
-type GenerateScheduleSuggestionInput = {
+export async function generateScheduleSuggestion(params: {
   prompt: string;
-  startDate: string;
-  timezone: string;
-};
+  startDate?: string;
+  timezone?: string;
+}): Promise<ScheduleSuggestion> {
+  const provider = (process.env.AI_PROVIDER || "GEMINI").toUpperCase();
 
-export async function generateScheduleSuggestion(
-  input: GenerateScheduleSuggestionInput
-): Promise<ScheduleSuggestion> {
-  const provider = (process.env.AI_PROVIDER || "OLLAMA").toUpperCase();
-
-  if (provider === "GEMINI") {
-    return generateScheduleSuggestionWithGemini(input);
+  if (provider !== "GEMINI") {
+    console.warn("[AI_PROVIDER] Provider diferente de GEMINI detectado. Usando Gemini mesmo assim.", {
+      provider
+    });
   }
 
-  return generateScheduleSuggestionWithOllama(input);
+  return generateScheduleSuggestionWithGemini(params);
 }

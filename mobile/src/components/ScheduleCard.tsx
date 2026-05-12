@@ -11,6 +11,11 @@ type ScheduleCardProps = {
     category?: string | null;
     sourceType?: string | null;
     reminders?: Array<{ id: string; startAt?: string }>;
+    progress?: {
+      total: number;
+      done: number;
+      completionRate: number;
+    };
   };
 };
 
@@ -39,6 +44,8 @@ export function ScheduleCard({ schedule }: ScheduleCardProps) {
   const { width, isPhone, isSmallPhone, isPhoneLarge } = useResponsive();
   const meta = getCategoryMeta(schedule.category);
   const remindersCount = schedule.reminders?.length || 0;
+  const completionRate = schedule.progress?.completionRate ?? 0;
+  const progressLabel = `${completionRate}%`;
   
   const isMobile = isPhone || isSmallPhone;
   const isCompact = isMobile || isPhoneLarge;
@@ -106,7 +113,7 @@ export function ScheduleCard({ schedule }: ScheduleCardProps) {
           <View style={styles.progressWrap}>
             <View style={[styles.progressRing, { borderColor: meta.color }]}>
               <Text style={[styles.progressText, { color: meta.color, fontSize: scaledFont(10, width) }]}>
-                {remindersCount ? "68%" : "0%"}
+                {progressLabel}
               </Text>
             </View>
             <Text style={[styles.metaLabel, { fontSize: scaledFont(11, width) }]}>Progresso</Text>
@@ -124,7 +131,7 @@ export function ScheduleCard({ schedule }: ScheduleCardProps) {
           
           <View style={[styles.progressRingMobile, { borderColor: meta.color }]}>
             <Text style={[styles.progressTextMobile, { color: meta.color, fontSize: scaledFont(9, width) }]}>
-              {remindersCount ? "68%" : "0%"}
+              {progressLabel}
             </Text>
           </View>
         </View>

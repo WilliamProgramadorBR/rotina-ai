@@ -1,7 +1,7 @@
-
-
-
-import { ScheduleSuggestion, scheduleSuggestionSchema } from "./scheduleSuggestion.schema";
+import {
+  ScheduleSuggestion,
+  scheduleSuggestionSchema
+} from "./scheduleSuggestion.schema";
 
 function getTodayInSaoPaulo() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -16,7 +16,7 @@ function stripJsonFence(text: string) {
   return text
     .replace(/^```json\s*/i, "")
     .replace(/^```\s*/i, "")
-    .replace(/```$/i, "")
+    .replace(/```\s*$/i, "")
     .trim();
 }
 
@@ -37,23 +37,34 @@ function parseJsonFromModel(text: string) {
   }
 }
 
-function fallbackSuggestion(prompt: string, startDate?: string, timezone = "America/Sao_Paulo"): ScheduleSuggestion {
+function fallbackSuggestion(
+  prompt: string,
+  startDate?: string,
+  timezone = "America/Sao_Paulo"
+): ScheduleSuggestion {
   const date = startDate || getTodayInSaoPaulo();
 
   return {
     title: "Cronograma sugerido",
-    description: `Sugestão criada em modo local a partir do prompt: ${prompt.slice(0, 140)}`,
+    description: `Sugestão criada sem IA a partir do prompt: ${prompt.slice(0, 140)}`,
+    notes: null,
+    links: [],
+    extraInfo: null,
     category: "OTHER",
     sourceType: "AI_PROMPT",
-    confidence: 0.35,
+    confidence: 0.25,
     warnings: [
-      "GEMINI_API_KEY não configurada. Esta é uma sugestão simples para testar o fluxo.",
+      "GEMINI_API_KEY não configurada. Esta é uma sugestão simples apenas para testar o fluxo.",
       "Revise todos os horários antes de salvar."
     ],
     reminders: [
       {
         title: "Revisar cronograma",
         description: "Ajuste este lembrete conforme sua rotina antes de confirmar.",
+        notes: null,
+        links: [],
+        location: null,
+        priority: "NORMAL",
         date,
         time: "09:00",
         timezone
@@ -81,16 +92,27 @@ Você é um assistente de planejamento de rotina para um app de lembretes.
 Sua função é transformar o pedido do usuário em uma sugestão estruturada de cronograma.
 
 REGRAS IMPORTANTES:
-- Responda APENAS JSON válido. Não use markdown.
-- Não dê diagnóstico médico, não altere prescrição, não recomende medicamento e não invente dosagem.
+- Responda APENAS JSON válido.
+- Não use markdown.
+- Não use bloco de código.
+- Não escreva explicações fora do JSON.
+- Não dê diagnóstico médico.
+- Não altere prescrição médica.
+- Não recomende medicamento.
+- Não invente dosagem.
 - Se o usuário mencionar receita/remédio, apenas organize lembretes com base no que foi informado.
 - Sempre inclua warning pedindo revisão humana quando o tema for saúde/remédio.
 - Gere no máximo 60 lembretes individuais.
-- Use datas no formato YYYY-MM-DD e horários no formato HH:mm.
+- Use datas no formato YYYY-MM-DD.
+- Use horários no formato HH:mm.
 - Timezone padrão: ${timezone}.
 - Data inicial de referência: ${today}.
 - Categorias permitidas: HEALTH, STUDY, WORKOUT, WORK, SLEEP, WATER, PERSONAL, OTHER.
 - sourceType deve ser AI_PROMPT.
+- priority deve ser uma destas opções: LOW, NORMAL, HIGH, CRITICAL.
+- confidence deve ser um número entre 0 e 1.
+- Quando não houver valor para campos opcionais, use null.
+- Quando não houver links, use array vazio [].
 
 Formato obrigatório:
 {
@@ -110,7 +132,7 @@ Formato obrigatório:
       "notes": "string ou null",
       "links": ["string"],
       "location": "string ou null",
-      "priority": "LOW | NORMAL | HIGH | CRITICAL",
+      "priority": "NORMAL",
       "date": "YYYY-MM-DD",
       "time": "HH:mm",
       "timezone": "America/Sao_Paulo"
@@ -127,42 +149,92 @@ Data inicial preferencial: ${today}
 Timezone: ${timezone}
 `.trim();
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45_000);
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      systemInstruction: {
-        parts: [{ text: systemInstruction }]
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    console.log("[GEMINI] Iniciando geração", {
+      model,
+      promptLength: params.prompt.length,
+      timezone,
+      today
+    });
+
+    const response = await fetch(url, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json"
       },
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: userPrompt }]
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: systemInstruction }]
+        },
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: userPrompt }]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 8192,
+          responseMimeType: "application/json"
         }
-      ],
-      generationConfig: {
-        temperature: 0.2,
-        responseMimeType: "application/json"
-      }
-    })
-  });
+      })
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Erro ao chamar Gemini: ${response.status} - ${errorText}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+
+      throw new Error(
+        `Erro ao chamar Gemini: ${response.status} - ${errorText}`
+      );
+    }
+
+    const data: any = await response.json();
+
+    const candidate = data?.candidates?.[0];
+    const finishReason = candidate?.finishReason;
+
+    if (finishReason && finishReason !== "STOP") {
+      console.warn("[GEMINI] Finalização não padrão", {
+        finishReason,
+        promptFeedback: data?.promptFeedback
+      });
+    }
+
+    const text = candidate?.content?.parts
+      ?.map((part: any) => part?.text || "")
+      .join("")
+      .trim();
+
+    if (!text) {
+      throw new Error(
+        `A IA não retornou conteúdo. finishReason=${finishReason || "UNKNOWN"}`
+      );
+    }
+
+    const parsed = parseJsonFromModel(text);
+    const suggestion = scheduleSuggestionSchema.parse(parsed);
+
+    console.log("[GEMINI] Sugestão gerada com sucesso", {
+      title: suggestion.title,
+      category: suggestion.category,
+      reminders: suggestion.reminders.length,
+      confidence: suggestion.confidence
+    });
+
+    return suggestion;
+  } catch (error: any) {
+    if (error?.name === "AbortError") {
+      throw new Error("Timeout ao chamar Gemini.");
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-  if (!text) {
-    throw new Error("A IA não retornou conteúdo.");
-  }
-
-  const parsed = parseJsonFromModel(text);
-  return scheduleSuggestionSchema.parse(parsed);
 }
