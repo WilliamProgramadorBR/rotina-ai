@@ -5,6 +5,7 @@ import { api } from "../../src/services/api";
 import { Reminder, Schedule } from "../../src/types/entities";
 import { colors, getCategoryMeta, spacing } from "../../src/theme";
 import { formatTime, getPeriodFromDate } from "../../src/utils/date";
+import { countOverdueReminders, formatOverdueLabel, isReminderOverdue } from "../../src/utils/reminderStatus";
 import { Button, EmptyState, LoadingState, StatCard } from "../../src/components/ui";
 import { PageHeader } from "../../src/components/PageHeader";
 import { ScreenLayout } from "../../src/components/ScreenLayout";
@@ -31,6 +32,7 @@ export default function ScheduleDetailScreen() {
   useFocusEffect(useCallback(() => { loadSchedule(); }, [loadSchedule]));
 
   const reminders = useMemo(() => schedule?.reminders || [], [schedule]);
+  const overdueCount = useMemo(() => countOverdueReminders(reminders), [reminders]);
   const meta = getCategoryMeta(schedule?.category);
 
   const grouped = useMemo(() => {
@@ -84,7 +86,7 @@ export default function ScheduleDetailScreen() {
               <View style={styles.stats}>
                 <StatCard title="Lembretes" value={reminders.length} icon="🔔" />
                 <StatCard title="Progresso" value={`${schedule.progress?.completionRate ?? 0}%`} icon="%" tone="green" />
-                <StatCard title="Categoria" value={meta.label} icon={meta.icon} tone="violet" />
+                <StatCard title="Atrasados" value={overdueCount} icon="!" tone="danger" />
               </View>
 
               <View style={styles.actionRow}>
@@ -101,15 +103,22 @@ export default function ScheduleDetailScreen() {
                   {grouped.map((group) => (
                     <View key={group.period} style={styles.period}>
                       <Text style={styles.periodTitle}>{group.period}</Text>
-                      {group.data.map((reminder: Reminder) => (
-                        <View key={reminder.id} style={styles.reminderRow}>
-                          <Text style={styles.reminderTime}>{formatTime(reminder.startAt)}</Text>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.reminderTitle}>{reminder.title}</Text>
-                            {reminder.description ? <Text style={styles.reminderDescription} numberOfLines={2}>{reminder.description}</Text> : null}
+                      {group.data.map((reminder: Reminder) => {
+                        const overdue = isReminderOverdue(reminder);
+
+                        return (
+                          <View key={reminder.id} style={[styles.reminderRow, overdue && styles.reminderRowOverdue]}>
+                            <Text style={[styles.reminderTime, overdue && styles.reminderTimeOverdue]}>
+                              {formatTime(reminder.startAt)}
+                            </Text>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.reminderTitle}>{reminder.title}</Text>
+                              {reminder.description ? <Text style={styles.reminderDescription} numberOfLines={2}>{reminder.description}</Text> : null}
+                              {overdue ? <Text style={styles.reminderOverdueText}>{formatOverdueLabel(reminder.startAt)}</Text> : null}
+                            </View>
                           </View>
-                        </View>
-                      ))}
+                        );
+                      })}
                     </View>
                   ))}
                 </ScrollView>
@@ -137,7 +146,10 @@ const styles = StyleSheet.create({
   period: { marginBottom: spacing.xl },
   periodTitle: { color: colors.textMuted, fontWeight: "900", marginBottom: spacing.sm },
   reminderRow: { backgroundColor: colors.white, borderRadius: 18, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, flexDirection: "row", gap: spacing.md, alignItems: "flex-start", marginBottom: spacing.sm },
+  reminderRowOverdue: { backgroundColor: "#FFF7F8", borderColor: "#FECDD6" },
   reminderTime: { color: colors.white, backgroundColor: colors.dark, borderRadius: 999, overflow: "hidden", paddingHorizontal: spacing.md, paddingVertical: spacing.xs, fontWeight: "900" },
+  reminderTimeOverdue: { backgroundColor: colors.danger },
   reminderTitle: { color: colors.text, fontWeight: "900", fontSize: 16 },
-  reminderDescription: { color: colors.textMuted, marginTop: spacing.xs, lineHeight: 20 }
+  reminderDescription: { color: colors.textMuted, marginTop: spacing.xs, lineHeight: 20 },
+  reminderOverdueText: { color: colors.danger, marginTop: spacing.xs, fontWeight: "900" }
 });

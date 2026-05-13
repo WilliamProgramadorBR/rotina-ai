@@ -256,7 +256,7 @@ export function StatCard({
   title: string; 
   value: number | string; 
   icon?: string; 
-  tone?: "blue" | "green" | "orange" | "violet"; 
+  tone?: "blue" | "green" | "orange" | "violet" | "danger"; 
   caption?: string 
 }) {
   const { width } = useWindowDimensions();
@@ -266,6 +266,7 @@ export function StatCard({
     tone === "green" ? styles.statIconGreen 
     : tone === "orange" ? styles.statIconOrange 
     : tone === "violet" ? styles.statIconViolet 
+    : tone === "danger" ? styles.statIconDanger
     : styles.statIconBlue;
 
   return (
@@ -545,6 +546,7 @@ const styles = StyleSheet.create({
   statIconGreen: { backgroundColor: colors.successSoft },
   statIconOrange: { backgroundColor: colors.warningSoft },
   statIconViolet: { backgroundColor: colors.accentSoft },
+  statIconDanger: { backgroundColor: colors.dangerSoft },
   statBadge: { 
     backgroundColor: colors.surfaceMuted, 
     borderRadius: radius.pill, 

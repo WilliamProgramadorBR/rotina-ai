@@ -227,7 +227,9 @@ export function buildDashboardMetrics(schedules: ScheduleForMetrics[]) {
     totalSchedules === 0
       ? "Crie seu primeiro cronograma para liberar metricas reais."
       : `Voce tem ${totalSchedules} cronograma${totalSchedules === 1 ? "" : "s"} ativo${totalSchedules === 1 ? "" : "s"} no app.`,
-    reminders.length === 0
+    overdueReminders.length > 0
+      ? `${overdueReminders.length} lembrete${overdueReminders.length === 1 ? "" : "s"} atrasado${overdueReminders.length === 1 ? "" : "s"} aguardando conclusao.`
+      : reminders.length === 0
       ? "Adicione lembretes para calcular progresso e consistencia."
       : `Sua taxa de conclusao dos lembretes vencidos esta em ${completionRate}%.`,
     bestCategory
@@ -246,6 +248,7 @@ export function buildDashboardMetrics(schedules: ScheduleForMetrics[]) {
       dueReminders: dueReminders.length,
       doneReminders: doneReminders.length,
       pendingReminders: overdueReminders.length,
+      overdueReminders: overdueReminders.length,
       skippedReminders: skippedReminders.length,
       missedReminders: missedReminders.length,
       snoozedReminders: snoozedReminders.length,

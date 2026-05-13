@@ -1,6 +1,12 @@
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { colors, fonts, getCategoryMeta, getPriorityMeta, radius, shadow, spacing, scaledFont } from "../theme";
 import { useResponsive } from "../hooks/useResponsive";
+import {
+  formatOverdueLabel,
+  isReminderDone,
+  isReminderOverdue,
+  isReminderSkipped
+} from "../utils/reminderStatus";
 
 type ReminderLike = {
   id: string;
@@ -10,11 +16,12 @@ type ReminderLike = {
   startAt: string;
   priority?: string | null;
   location?: string | null;
+  status?: string | null;
   schedule?: {
     title?: string | null;
     category?: string | null;
   } | null;
-  logs?: Array<{ action: string }>;
+  logs?: Array<{ action: string; createdAt?: string | Date | null }>;
 };
 
 type ReminderCardProps = {
@@ -30,30 +37,36 @@ function formatTime(value: string) {
   return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
-function hasAction(reminder: ReminderLike, action: string) {
-  return reminder.logs?.some((log) => log.action === action);
-}
-
 export function ReminderCard({ reminder, onDone, onSnooze, onSkip }: ReminderCardProps) {
   const { width, isPhone, isSmallPhone } = useResponsive();
   const category = getCategoryMeta(reminder.schedule?.category);
   const priority = getPriorityMeta(reminder.priority || "NORMAL");
-  const done = hasAction(reminder, "DONE");
-  const skipped = hasAction(reminder, "SKIPPED");
+  const done = isReminderDone(reminder);
+  const skipped = isReminderSkipped(reminder);
+  const overdue = isReminderOverdue(reminder);
+  const overdueLabel = formatOverdueLabel(reminder.startAt);
 
   const isMobile = isPhone || isSmallPhone;
 
   return (
-    <View style={[styles.card, done && styles.cardDone, isMobile && styles.cardMobile]}>
+    <View style={[styles.card, overdue && styles.cardOverdue, done && styles.cardDone, isMobile && styles.cardMobile]}>
       {/* Time Rail - Hidden on very small screens */}
       {!isSmallPhone && (
         <View style={[styles.leftRail, isMobile && styles.leftRailMobile]}>
-          <View style={[styles.timePill, { backgroundColor: category.background, borderColor: category.border }]}>
-            <Text style={[styles.timeText, { color: category.color, fontSize: scaledFont(12, width) }]}>
+          <View
+            style={[
+              styles.timePill,
+              {
+                backgroundColor: overdue ? colors.dangerSoft : category.background,
+                borderColor: overdue ? "#FECDD6" : category.border
+              }
+            ]}
+          >
+            <Text style={[styles.timeText, { color: overdue ? colors.danger : category.color, fontSize: scaledFont(12, width) }]}>
               {formatTime(reminder.startAt)}
             </Text>
           </View>
-          <View style={[styles.timelineDot, { backgroundColor: category.color }]} />
+          <View style={[styles.timelineDot, { backgroundColor: overdue ? colors.danger : category.color }]} />
           <View style={styles.timelineLine} />
         </View>
       )}
@@ -74,8 +87,8 @@ export function ReminderCard({ reminder, onDone, onSnooze, onSkip }: ReminderCar
           <View style={styles.titleArea}>
             {/* Time badge for mobile */}
             {isSmallPhone && (
-              <View style={[styles.timeBadgeMobile, { backgroundColor: category.background }]}>
-                <Text style={[styles.timeBadgeMobileText, { color: category.color }]}>
+              <View style={[styles.timeBadgeMobile, { backgroundColor: overdue ? colors.dangerSoft : category.background }]}>
+                <Text style={[styles.timeBadgeMobileText, { color: overdue ? colors.danger : category.color }]}>
                   {formatTime(reminder.startAt)}
                 </Text>
               </View>
@@ -93,6 +106,13 @@ export function ReminderCard({ reminder, onDone, onSnooze, onSkip }: ReminderCar
                   {category.label}
                 </Text>
               </View>
+              {overdue ? (
+                <View style={styles.overdueBadge}>
+                  <Text style={[styles.overdueBadgeText, { fontSize: scaledFont(11, width) }]}>
+                    Atrasado
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
             {reminder.description ? (
@@ -156,6 +176,14 @@ export function ReminderCard({ reminder, onDone, onSnooze, onSkip }: ReminderCar
           </View>
         ) : null}
 
+        {overdue ? (
+          <View style={styles.overdueBox}>
+            <Text style={[styles.overdueText, { fontSize: scaledFont(12, width) }]}>
+              {overdueLabel}
+            </Text>
+          </View>
+        ) : null}
+
         {/* Actions */}
         <View style={[styles.actions, isMobile && styles.actionsMobile]}>
           <Pressable 
@@ -204,6 +232,10 @@ const styles = StyleSheet.create({
   },
   cardDone: { 
     opacity: 0.72 
+  },
+  cardOverdue: {
+    borderColor: "#FECDD6",
+    backgroundColor: "#FFF7F8"
   },
   cardMobile: {
     borderRadius: radius.lg
@@ -328,6 +360,18 @@ const styles = StyleSheet.create({
   categoryText: { 
     fontFamily: fonts.bold 
   },
+
+  overdueBadge: {
+    borderRadius: radius.pill,
+    backgroundColor: colors.dangerSoft,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2
+  },
+
+  overdueBadgeText: {
+    color: colors.danger,
+    fontFamily: fonts.bold
+  },
   
   metaRow: { 
     flexDirection: "row", 
@@ -393,6 +437,20 @@ const styles = StyleSheet.create({
     color: colors.textMuted, 
     fontFamily: fonts.regular, 
     lineHeight: 19 
+  },
+
+  overdueBox: {
+    alignSelf: "flex-start",
+    borderRadius: radius.md,
+    backgroundColor: colors.dangerSoft,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.md
+  },
+
+  overdueText: {
+    color: colors.danger,
+    fontFamily: fonts.bold
   },
   
   actions: { 

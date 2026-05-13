@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import { Button, Card, Input, SectionTitle } from "../src/components/ui";
@@ -8,6 +8,14 @@ import { colors, fonts, radius, shadow, spacing, scaledFont } from "../src/theme
 import { configureAlarmNotifications, requestAlarmNotificationPermission, scheduleReminderAlarm } from "../src/services/alarmNotifications";
 import { useResponsive } from "../src/hooks/useResponsive";
 import { getApiBaseUrl, getDefaultApiBaseUrl, resetApiBaseUrl, saveApiBaseUrl } from "../src/services/api";
+import {
+  clearCustomRingtone,
+  getCustomRingtone,
+  pickCustomRingtone,
+  playAlarmRingtone,
+  stopAlarmRingtone
+} from "../src/services/customRingtone";
+import type { CustomRingtone } from "../src/services/customRingtone";
 import { getDashboardMetricsRequest } from "../src/services/metrics";
 import { DashboardMetrics } from "../src/types/api";
 
@@ -17,12 +25,25 @@ export default function SettingsScreen() {
   const [apiUrl, setApiUrl] = useState(getDefaultApiBaseUrl());
   const [isSavingApiUrl, setIsSavingApiUrl] = useState(false);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardMetrics["summary"] | null>(null);
+  const [customRingtone, setCustomRingtone] = useState<CustomRingtone | null>(null);
+  const [isPickingRingtone, setIsPickingRingtone] = useState(false);
+  const [isPreviewingRingtone, setIsPreviewingRingtone] = useState(false);
+  const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     getApiBaseUrl().then(setApiUrl);
+    getCustomRingtone().then(setCustomRingtone);
     getDashboardMetricsRequest()
       .then((metrics) => setDashboardSummary(metrics.summary))
       .catch((error) => console.log("[SETTINGS METRICS ERROR]", error?.response?.data || error));
+
+    return () => {
+      if (previewTimeoutRef.current) {
+        clearTimeout(previewTimeoutRef.current);
+      }
+
+      stopAlarmRingtone();
+    };
   }, []);
 
   async function handleTestAlarm() {
@@ -74,6 +95,69 @@ export default function SettingsScreen() {
       Alert.alert("Erro", error?.message || "Nao foi possivel restaurar a URL padrao.");
     } finally {
       setIsSavingApiUrl(false);
+    }
+  }
+
+  async function handlePickRingtone() {
+    try {
+      setIsPickingRingtone(true);
+      const ringtone = await pickCustomRingtone();
+
+      if (ringtone) {
+        setCustomRingtone(ringtone);
+        Alert.alert("Toque salvo", "O novo audio foi salvo.");
+      }
+    } catch (error: any) {
+      Alert.alert("Erro", error?.message || "Nao foi possivel salvar o toque.");
+    } finally {
+      setIsPickingRingtone(false);
+    }
+  }
+
+  async function handleTogglePreviewRingtone() {
+    try {
+      if (isPreviewingRingtone) {
+        if (previewTimeoutRef.current) {
+          clearTimeout(previewTimeoutRef.current);
+          previewTimeoutRef.current = null;
+        }
+
+        await stopAlarmRingtone();
+        setIsPreviewingRingtone(false);
+        return;
+      }
+
+      const ringtone = await playAlarmRingtone();
+
+      if (!ringtone) {
+        Alert.alert("Sem toque", "Escolha um audio primeiro.");
+        return;
+      }
+
+      setIsPreviewingRingtone(true);
+      previewTimeoutRef.current = setTimeout(() => {
+        stopAlarmRingtone();
+        setIsPreviewingRingtone(false);
+        previewTimeoutRef.current = null;
+      }, 8000);
+    } catch (error: any) {
+      Alert.alert("Erro", error?.message || "Nao foi possivel tocar o audio.");
+    }
+  }
+
+  async function handleClearRingtone() {
+    try {
+      if (previewTimeoutRef.current) {
+        clearTimeout(previewTimeoutRef.current);
+        previewTimeoutRef.current = null;
+      }
+
+      await clearCustomRingtone();
+      setCustomRingtone(null);
+      setIsPreviewingRingtone(false);
+      Alert.alert("Toque removido", "O alarme voltou ao som padrao.");
+    } catch (error: any) {
+      Alert.alert("Erro", error?.message || "Nao foi possivel remover o toque.");
     }
   }
 
@@ -188,6 +272,45 @@ export default function SettingsScreen() {
                 <Metric label="Conclusao geral" value={`${dashboardSummary?.completionRate ?? 0}% dos vencidos`} tone="green" width={width} isMobile={isMobile} />
               </Card>
 
+              <Card style={[styles.ringtoneCard, isMobile && styles.ringtoneCardMobile]}>
+                <SectionTitle
+                  title="Toque do alarme"
+                  subtitle="Audio personalizado para alarmes ativos."
+                />
+                <View style={styles.ringtoneInfo}>
+                  <Text style={[styles.ringtoneLabel, { fontSize: scaledFont(12, width) }]}>Arquivo atual</Text>
+                  <Text style={[styles.ringtoneName, { fontSize: scaledFont(14, width) }]} numberOfLines={2}>
+                    {customRingtone?.name || "Som padrao"}
+                  </Text>
+                </View>
+                <View style={[styles.ringtoneActions, isMobile && styles.ringtoneActionsMobile]}>
+                  <Button
+                    title={customRingtone ? "Trocar audio" : "Escolher audio"}
+                    variant="ai"
+                    onPress={handlePickRingtone}
+                    loading={isPickingRingtone}
+                    style={styles.ringtoneActionButton}
+                    size={isMobile ? "md" : "lg"}
+                  />
+                  <Button
+                    title={isPreviewingRingtone ? "Parar" : "Ouvir"}
+                    variant="secondary"
+                    onPress={handleTogglePreviewRingtone}
+                    disabled={!customRingtone || isPickingRingtone}
+                    style={styles.ringtoneActionButton}
+                    size={isMobile ? "md" : "lg"}
+                  />
+                  <Button
+                    title="Remover"
+                    variant="danger"
+                    onPress={handleClearRingtone}
+                    disabled={!customRingtone || isPickingRingtone}
+                    style={styles.ringtoneActionButton}
+                    size={isMobile ? "md" : "lg"}
+                  />
+                </View>
+              </Card>
+
               {/* Help Card */}
               <Card style={[styles.helpCard, isMobile && styles.helpCardMobile]}>
                 <Text style={[styles.helpTitle, { fontSize: scaledFont(isMobile ? 16 : 18, width) }]}>
@@ -251,13 +374,16 @@ export default function SettingsScreen() {
                   Rotina AI - Gerenciador de Rotinas Inteligente
                 </Text>
                 <Text style={[styles.creditsText, { fontSize: scaledFont(12, width) }]}>
-                  Criador: WilliamProgramadorBR
+                  Criador: William Oliveira Dos Santos
+                </Text>
+                <Text style={[styles.creditsText, { fontSize: scaledFont(12, width) }]}>
+                  Contato: william100william@gmail.com
                 </Text>
                 <Text style={[styles.creditsText, { fontSize: scaledFont(12, width) }]}>
                   Conta Expo: williamdevbackend
                 </Text>
                 <Text style={[styles.creditsText, { fontSize: scaledFont(12, width) }]}>
-                  Versao 1.0.0
+                  Versao 1.2.0
                 </Text>
               </Card>
             </View>
@@ -493,6 +619,40 @@ const styles = StyleSheet.create({
   },
   healthCardMobile: {
     padding: spacing.md
+  },
+
+  ringtoneCard: {
+    padding: spacing.lg
+  },
+  ringtoneCardMobile: {
+    padding: spacing.md
+  },
+  ringtoneInfo: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+    padding: spacing.md,
+    marginBottom: spacing.md
+  },
+  ringtoneLabel: {
+    color: colors.textMuted,
+    fontFamily: fonts.medium
+  },
+  ringtoneName: {
+    color: colors.text,
+    fontFamily: fonts.bold,
+    marginTop: spacing.xs
+  },
+  ringtoneActions: {
+    flexDirection: "row",
+    gap: spacing.sm
+  },
+  ringtoneActionsMobile: {
+    flexDirection: "column"
+  },
+  ringtoneActionButton: {
+    flex: 1
   },
   
   metric: { 

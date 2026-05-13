@@ -16,6 +16,7 @@ import { Manrope_800ExtraBold } from "@expo-google-fonts/manrope";
 
 import { AuthProvider } from "../src/context/AuthContext";
 import { ThemeProvider } from "../src/context/ThemeContext";
+import { AppUpdateInstaller } from "../src/components/AppUpdateInstaller";
 import { configureAlarmNotifications } from "../src/services/alarmNotifications";
 import { openAlarmFromNotificationResponse } from "../src/services/alarmNavigation";
 import { colors } from "../src/theme";
@@ -63,6 +64,7 @@ export default function RootLayout() {
       <ThemeProvider>
         <AuthProvider>
           <AlarmNotificationObserver />
+          <AppUpdateInstaller />
           <StatusBar style="dark" />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }} />
         </AuthProvider>

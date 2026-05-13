@@ -81,6 +81,7 @@ export type DashboardMetrics = {
     dueReminders: number;
     doneReminders: number;
     pendingReminders: number;
+    overdueReminders?: number;
     skippedReminders: number;
     missedReminders: number;
     snoozedReminders: number;

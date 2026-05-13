@@ -20,7 +20,7 @@ import { useResponsive } from "../src/hooks/useResponsive";
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const { width, isPhone, isPhoneLarge, paddingHorizontal } = useResponsive();
-  const [email, setEmail] = useState("william100william@gmail.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);

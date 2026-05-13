@@ -2,8 +2,8 @@
   "expo": {
     "name": "Rotina AI",
     "slug": "rotina-ai",
-    "description": "Gerenciador de rotinas inteligente desenvolvido por WilliamProgramadorBR.",
-    "version": "1.0.0",
+    "description": "Gerenciador de rotinas inteligente desenvolvido por William Oliveira Dos Santos.",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "rotinaai",
@@ -25,12 +25,20 @@
           ]
         }
       ],
-      "expo-dev-client",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-audio",
+        {
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": true,
+          "microphonePermission": false
+        }
+      ]
     ],
     "extra": {
       "creator": {
-        "name": "WilliamProgramadorBR",
+        "name": "William Oliveira Dos Santos",
+        "contact": "william100william@gmail.com",
         "expoOwner": "williamdevbackend"
       },
       "router": {},

@@ -2,6 +2,11 @@ import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-na
 import { router } from "expo-router";
 import { colors, fonts, getCategoryMeta, radius, shadow, spacing, scaledFont } from "../theme";
 import { useResponsive } from "../hooks/useResponsive";
+import {
+  countOverdueReminders,
+  formatOverdueLabel,
+  isReminderOverdue
+} from "../utils/reminderStatus";
 
 type ScheduleCardProps = {
   schedule: {
@@ -10,7 +15,12 @@ type ScheduleCardProps = {
     description?: string | null;
     category?: string | null;
     sourceType?: string | null;
-    reminders?: Array<{ id: string; startAt?: string }>;
+    reminders?: Array<{
+      id: string;
+      startAt?: string;
+      status?: string | null;
+      logs?: Array<{ action: string; createdAt?: string | Date | null }>;
+    }>;
     progress?: {
       total: number;
       done: number;
@@ -44,6 +54,8 @@ export function ScheduleCard({ schedule }: ScheduleCardProps) {
   const { width, isPhone, isSmallPhone, isPhoneLarge } = useResponsive();
   const meta = getCategoryMeta(schedule.category);
   const remindersCount = schedule.reminders?.length || 0;
+  const overdueCount = countOverdueReminders(schedule.reminders || []);
+  const firstOverdue = (schedule.reminders || []).find((reminder) => isReminderOverdue(reminder));
   const completionRate = schedule.progress?.completionRate ?? 0;
   const progressLabel = `${completionRate}%`;
   
@@ -54,6 +66,7 @@ export function ScheduleCard({ schedule }: ScheduleCardProps) {
     <Pressable
       style={({ pressed }) => [
         styles.card, 
+        overdueCount > 0 && styles.cardOverdue,
         pressed && { opacity: 0.9, transform: [{ scale: 0.995 }] },
         isMobile && styles.cardMobile
       ]}
@@ -80,6 +93,13 @@ export function ScheduleCard({ schedule }: ScheduleCardProps) {
             {meta.label}
           </Text>
         </View>
+        {overdueCount > 0 ? (
+          <View style={styles.overdueBadge}>
+            <Text style={[styles.overdueBadgeText, { fontSize: scaledFont(11, width) }]}>
+              {overdueCount} {overdueCount === 1 ? "atrasado" : "atrasados"}
+            </Text>
+          </View>
+        ) : null}
 
         <Text 
           style={[styles.title, { fontSize: scaledFont(isMobile ? 16 : 18, width) }]} 
@@ -105,8 +125,8 @@ export function ScheduleCard({ schedule }: ScheduleCardProps) {
 
           <View style={styles.metaBlockWide}>
             <Text style={[styles.metaLabel, { fontSize: scaledFont(11, width) }]}>Proximo lembrete</Text>
-            <Text style={[styles.metaValue, { fontSize: scaledFont(14, width) }]}>
-              {getNextReminderLabel(schedule.reminders)}
+            <Text style={[styles.metaValue, overdueCount > 0 && styles.metaValueDanger, { fontSize: scaledFont(14, width) }]}>
+              {overdueCount > 0 ? formatOverdueLabel(firstOverdue?.startAt) : getNextReminderLabel(schedule.reminders)}
             </Text>
           </View>
 
@@ -125,8 +145,12 @@ export function ScheduleCard({ schedule }: ScheduleCardProps) {
       {isCompact && (
         <View style={styles.mobileMetaRow}>
           <View style={styles.mobileMetaItem}>
-            <Text style={[styles.mobileMetaValue, { fontSize: scaledFont(14, width) }]}>{remindersCount}</Text>
-            <Text style={[styles.mobileMetaLabel, { fontSize: scaledFont(10, width) }]}>Alarmes</Text>
+            <Text style={[styles.mobileMetaValue, overdueCount > 0 && styles.metaValueDanger, { fontSize: scaledFont(14, width) }]}>
+              {overdueCount > 0 ? overdueCount : remindersCount}
+            </Text>
+            <Text style={[styles.mobileMetaLabel, { fontSize: scaledFont(10, width) }]}>
+              {overdueCount > 0 ? "Atrasados" : "Alarmes"}
+            </Text>
           </View>
           
           <View style={[styles.progressRingMobile, { borderColor: meta.color }]}>
@@ -168,6 +192,10 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     minHeight: 100
   },
+  cardOverdue: {
+    borderColor: "#FECDD6",
+    backgroundColor: "#FFF7F8"
+  },
   
   iconBox: { 
     width: 64, 
@@ -207,6 +235,20 @@ const styles = StyleSheet.create({
   badgeText: { 
     fontFamily: fonts.bold 
   },
+
+  overdueBadge: {
+    alignSelf: "flex-start",
+    borderRadius: radius.pill,
+    backgroundColor: colors.dangerSoft,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    marginBottom: spacing.xs
+  },
+
+  overdueBadgeText: {
+    color: colors.danger,
+    fontFamily: fonts.bold
+  },
   
   title: { 
     color: colors.text, 
@@ -243,6 +285,9 @@ const styles = StyleSheet.create({
     color: colors.text, 
     fontFamily: fonts.bold, 
     marginTop: 3 
+  },
+  metaValueDanger: {
+    color: colors.danger
   },
   
   progressWrap: { 

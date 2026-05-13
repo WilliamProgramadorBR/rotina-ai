@@ -9,7 +9,7 @@ const DEFAULT_API_URL =
   process.env.EXPO_PUBLIC_API_URL ||
   (Platform.OS === "web"
     ? "http://localhost:3333"
-    : "https://dental-bye-somerset-shirt.trycloudflare.com");
+    : "https://break-fat-pie-chamber.trycloudflare.com");
 
 const DEFAULT_TIMEOUT_MS = 30000;
 const AI_TIMEOUT_MS = 90000;

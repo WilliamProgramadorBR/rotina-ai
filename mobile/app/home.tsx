@@ -12,6 +12,12 @@ import { ScreenLayout } from "../src/components/ScreenLayout";
 import { ReminderCard } from "../src/components/ReminderCard";
 import { useResponsive } from "../src/hooks/useResponsive";
 import {
+  countOverdueReminders,
+  isReminderDone,
+  isReminderOverdue,
+  isReminderSkipped
+} from "../src/utils/reminderStatus";
+import {
   Alert,
   Pressable,
   StyleSheet,
@@ -29,13 +35,21 @@ type Reminder = {
   priority?: string | null;
   location?: string | null;
   schedule?: { title?: string | null; category?: string | null } | null;
-  logs?: Array<{ action: string }>;
+  logs?: Array<{ action: string; createdAt?: string | Date | null }>;
 };
 
 const periods = ["Madrugada", "Manha", "Tarde", "Noite"];
 
-function reminderHasAction(reminder: Reminder, action: string) {
-  return reminder.logs?.some((log) => log.action === action);
+function isTodayReminder(reminder: Reminder) {
+  const date = new Date(reminder.startAt);
+  const now = new Date();
+
+  return (
+    !Number.isNaN(date.getTime()) &&
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  );
 }
 
 export default function HomeScreen() {
@@ -44,7 +58,7 @@ export default function HomeScreen() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardMetrics["summary"] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState<"ALL" | "PENDING" | "DONE">("ALL");
+  const [activeFilter, setActiveFilter] = useState<"ALL" | "OVERDUE" | "PENDING" | "DONE">("ALL");
 
   const isMobileLayout = isPhone || isSmallPhone;
   const isCompact = isPhone || isPhoneLarge;
@@ -72,9 +86,10 @@ export default function HomeScreen() {
   useFocusEffect(useCallback(() => { loadTodayReminders(); }, [loadTodayReminders]));
 
   const filteredReminders = useMemo(() => {
-    if (activeFilter === "DONE") return reminders.filter((reminder) => reminderHasAction(reminder, "DONE"));
+    if (activeFilter === "DONE") return reminders.filter(isReminderDone);
+    if (activeFilter === "OVERDUE") return reminders.filter(isReminderOverdue);
     if (activeFilter === "PENDING") {
-      return reminders.filter((reminder) => !reminderHasAction(reminder, "DONE") && !reminderHasAction(reminder, "SKIPPED"));
+      return reminders.filter((reminder) => !isReminderDone(reminder) && !isReminderSkipped(reminder));
     }
     return reminders;
   }, [activeFilter, reminders]);
@@ -85,8 +100,9 @@ export default function HomeScreen() {
       .filter((group) => group.data.length > 0);
   }, [filteredReminders]);
 
-  const doneCount = reminders.filter((reminder) => reminderHasAction(reminder, "DONE")).length;
-  const pendingCount = reminders.filter((reminder) => !reminderHasAction(reminder, "DONE") && !reminderHasAction(reminder, "SKIPPED")).length;
+  const doneCount = reminders.filter(isReminderDone).length;
+  const todayCount = reminders.filter(isTodayReminder).length;
+  const overdueCount = countOverdueReminders(reminders);
 
   async function registerAction(reminderId: string, action: "DONE" | "SNOOZED" | "SKIPPED") {
     try {
@@ -146,10 +162,10 @@ export default function HomeScreen() {
           {/* Stats Grid */}
           <View style={[styles.stats, { gap }]}>
             <View style={[styles.statItem, isSmallPhone && styles.statItemSmall]}>
-              <StatCard title="Hoje" value={reminders.length} icon="T" caption="Compromissos" />
+              <StatCard title="Hoje" value={todayCount} icon="T" caption="Compromissos" />
             </View>
             <View style={[styles.statItem, isSmallPhone && styles.statItemSmall]}>
-              <StatCard title="Pendentes" value={pendingCount} icon="P" tone="orange" caption="Aguardando" />
+              <StatCard title="Atrasadas" value={overdueCount} icon="!" tone="danger" caption="sem conclusao" />
             </View>
             <View style={[styles.statItem, isSmallPhone && styles.statItemSmall]}>
               <StatCard title="Feitos" value={doneCount} icon="V" tone="green" caption="Concluidos" />
@@ -158,6 +174,25 @@ export default function HomeScreen() {
               <StatCard title="Sequencia" value={dashboardSummary?.streakDays || 0} icon="S" tone="violet" caption="dias 100%" />
             </View>
           </View>
+
+          {overdueCount > 0 ? (
+            <Pressable
+              style={[styles.overdueNotice, isMobileLayout && styles.overdueNoticeMobile]}
+              onPress={() => setActiveFilter("OVERDUE")}
+            >
+              <View style={styles.overdueNoticeIcon}>
+                <Text style={styles.overdueNoticeIconText}>!</Text>
+              </View>
+              <View style={styles.overdueNoticeCopy}>
+                <Text style={[styles.overdueNoticeTitle, { fontSize: scaledFont(14, width) }]}>
+                  {overdueCount} {overdueCount === 1 ? "atividade atrasada" : "atividades atrasadas"}
+                </Text>
+                <Text style={[styles.overdueNoticeText, { fontSize: scaledFont(12, width) }]}>
+                  Pendentes de conclusao ou decisao.
+                </Text>
+              </View>
+            </Pressable>
+          ) : null}
 
           {/* Quick Actions */}
           <Text style={[styles.sectionLabel, { fontSize: scaledFont(14, width) }]}>Acoes rapidas</Text>
@@ -234,15 +269,23 @@ export default function HomeScreen() {
           {/* Today Section */}
           <View style={[styles.todayHeader, isMobileLayout && styles.todayHeaderMobile]}>
             <View style={styles.todayTitleRow}>
-              <Text style={[styles.todayTitle, { fontSize: scaledFont(20, width) }]}>Hoje</Text>
+              <Text style={[styles.todayTitle, { fontSize: scaledFont(20, width) }]}>Hoje e atrasadas</Text>
               <View style={styles.todayBadge}>
-                <Text style={[styles.todayBadgeText, { fontSize: scaledFont(11, width) }]}>{reminders.length} itens</Text>
+                <Text style={[styles.todayBadgeText, { fontSize: scaledFont(11, width) }]}>{todayCount} hoje</Text>
               </View>
+              {overdueCount > 0 ? (
+                <View style={styles.todayOverdueBadge}>
+                  <Text style={[styles.todayOverdueBadgeText, { fontSize: scaledFont(11, width) }]}>
+                    {overdueCount} atrasadas
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
             <View style={[styles.filters, { gap: spacing.sm }]}>
               {[
                 { key: "ALL", label: "Todos" },
+                { key: "OVERDUE", label: "Atrasados" },
                 { key: "PENDING", label: "Pendentes" },
                 { key: "DONE", label: "Feitos" }
               ].map((item) => (
@@ -463,6 +506,49 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
 
+  overdueNotice: {
+    minHeight: 74,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: "#FECDD6",
+    backgroundColor: "#FFF7F8",
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    ...shadow.soft
+  },
+  overdueNoticeMobile: {
+    alignItems: "flex-start"
+  },
+  overdueNoticeIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: colors.danger,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  overdueNoticeIconText: {
+    color: colors.white,
+    fontFamily: fonts.title,
+    fontSize: 18
+  },
+  overdueNoticeCopy: {
+    flex: 1,
+    minWidth: 0
+  },
+  overdueNoticeTitle: {
+    color: colors.danger,
+    fontFamily: fonts.bold
+  },
+  overdueNoticeText: {
+    color: colors.textMuted,
+    fontFamily: fonts.medium,
+    marginTop: 2
+  },
+
   sectionLabel: {
     color: colors.text,
     fontFamily: fonts.bold,
@@ -592,6 +678,18 @@ const styles = StyleSheet.create({
 
   todayBadgeText: {
     color: colors.primary,
+    fontFamily: fonts.bold
+  },
+
+  todayOverdueBadge: {
+    backgroundColor: colors.dangerSoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3
+  },
+
+  todayOverdueBadgeText: {
+    color: colors.danger,
     fontFamily: fonts.bold
   },
 

@@ -61,6 +61,7 @@ export default function DashboardScreen() {
   const maxWeeklyTotal = useMemo(() => {
     return Math.max(...(metrics?.weekly || []).map((item) => item.total), 1);
   }, [metrics]);
+  const overdueReminders = metrics?.summary.overdueReminders ?? metrics?.summary.pendingReminders ?? 0;
 
   return (
     <ScreenLayout>
@@ -109,7 +110,7 @@ export default function DashboardScreen() {
                 <View style={styles.heroCopy}>
                   <Text style={[styles.heroKicker, { fontSize: scaledFont(10, width) }]}>INTELIGENCIA DA ROTINA</Text>
                   <Text style={[styles.heroTitle, { fontSize: scaledFont(isMobile ? 20 : 26, width) }]}>
-                    {metrics.summary.completionRate}% de conclusao nos lembretes vencidos.
+                    {overdueReminders} {overdueReminders === 1 ? "atividade atrasada" : "atividades atrasadas"} sem conclusao.
                   </Text>
                   <Text style={[styles.heroText, { fontSize: scaledFont(13, width) }]}>
                     Acompanhe desempenho, categorias fortes, pendencias e uso da IA com dados do backend.
@@ -122,7 +123,7 @@ export default function DashboardScreen() {
                   <StatCard title="Conclusao" value={`${metrics.summary.completionRate}%`} icon="%" tone="green" caption="vencidos" />
                 </View>
                 <View style={[styles.statItem, isSmallPhone && styles.statItemSmall]}>
-                  <StatCard title="Pendentes" value={metrics.summary.pendingReminders} icon="P" tone="orange" caption="atrasados" />
+                  <StatCard title="Atrasados" value={overdueReminders} icon="!" tone="danger" caption="sem conclusao" />
                 </View>
                 <View style={[styles.statItem, isSmallPhone && styles.statItemSmall]}>
                   <StatCard title="Progresso" value={`${metrics.summary.routineProgressRate}%`} icon="R" caption="geral" />
@@ -166,6 +167,7 @@ export default function DashboardScreen() {
                   <View style={styles.kpiList}>
                     <KpiRow label="Cronogramas ativos" value={metrics.summary.activeSchedules} />
                     <KpiRow label="Lembretes criados" value={metrics.summary.totalReminders} />
+                    <KpiRow label="Atrasados sem conclusao" value={overdueReminders} />
                     <KpiRow label="Feitos" value={metrics.summary.doneReminders} />
                     <KpiRow label="Adiados" value={metrics.summary.snoozedReminders} />
                     <KpiRow label="Pulados" value={metrics.summary.skippedReminders} />

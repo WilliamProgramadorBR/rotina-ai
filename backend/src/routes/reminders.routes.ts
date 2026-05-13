@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
+import { getLatestReminderAction } from "../services/metrics.service";
 
 const reminderPrioritySchema = z.enum([
   "LOW",
@@ -100,7 +101,6 @@ export async function remindersRoutes(app: FastifyInstance) {
         },
         status: "ACTIVE",
         startAt: {
-          gte: startOfDay,
           lte: endOfDay
         }
       },
@@ -118,7 +118,17 @@ export async function remindersRoutes(app: FastifyInstance) {
     });
 
     return {
-      reminders
+      reminders: reminders.filter((reminder) => {
+        const isToday = reminder.startAt >= startOfDay && reminder.startAt <= endOfDay;
+
+        if (isToday) {
+          return true;
+        }
+
+        const latestAction = getLatestReminderAction(reminder);
+
+        return latestAction !== "DONE" && latestAction !== "SKIPPED" && latestAction !== "MISSED";
+      })
     };
   });
 

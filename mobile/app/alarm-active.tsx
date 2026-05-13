@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +10,7 @@ import {
 import { router, useLocalSearchParams } from "expo-router";
 import { api } from "../src/services/api";
 import { scheduleSnoozeAlarm } from "../src/services/alarmNotifications";
+import { playAlarmRingtone, stopAlarmRingtone } from "../src/services/customRingtone";
 import { colors, spacing } from "../src/theme";
 
 type AlarmAction = "DONE" | "SNOOZED" | "SKIPPED";
@@ -46,10 +47,19 @@ export default function AlarmActiveScreen() {
   const startAt = getSafeString(params.startAt);
   const scheduleTitle = getSafeString(params.scheduleTitle);
   const notificationAction = getSafeString(params.action);
+  const isTestAlarm = reminderId === "test-alarm";
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const timeLabel = useMemo(() => formatAlarmTime(startAt), [startAt]);
+
+  useEffect(() => {
+    playAlarmRingtone().catch((error) => console.log("[ALARM RINGTONE ERROR]", error));
+
+    return () => {
+      stopAlarmRingtone();
+    };
+  }, []);
 
   async function registerAction(action: AlarmAction) {
     if (!reminderId) {
@@ -59,6 +69,29 @@ export default function AlarmActiveScreen() {
 
     try {
       setIsSubmitting(true);
+      await stopAlarmRingtone();
+
+      if (isTestAlarm) {
+        if (action === "SNOOZED") {
+          await scheduleSnoozeAlarm(
+            {
+              reminderId,
+              title,
+              description,
+              startAt,
+              scheduleTitle
+            },
+            10
+          );
+
+          Alert.alert("Teste adiado", "Vou tocar o alarme de teste novamente em 10 minutos.");
+        } else {
+          Alert.alert("Teste finalizado", "O alarme de teste foi encerrado.");
+        }
+
+        router.replace("/settings");
+        return;
+      }
 
       await api.post(`/reminders/${reminderId}/log`, {
         action,

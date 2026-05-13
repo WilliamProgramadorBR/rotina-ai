@@ -10,6 +10,7 @@ import {
 import { router } from "expo-router";
 import { Calendar, DateData } from "react-native-calendars";
 import { api } from "../src/services/api";
+import { formatOverdueLabel, isReminderOverdue } from "../src/utils/reminderStatus";
 
 type Reminder = {
   id: string;
@@ -116,14 +117,16 @@ export default function CalendarScreen() {
     const marks: Record<string, any> = {};
 
     Object.keys(remindersByDate).forEach((dateKey) => {
-      const count = remindersByDate[dateKey].length;
+      const dayReminders = remindersByDate[dateKey];
+      const count = dayReminders.length;
+      const hasOverdue = dayReminders.some(isReminderOverdue);
 
       marks[dateKey] = {
         marked: true,
         dots: [
           {
             key: "reminders",
-            color: count >= 5 ? "#F97316" : "#2563EB"
+            color: hasOverdue ? "#E11D48" : count >= 5 ? "#F97316" : "#2563EB"
           }
         ]
       };
@@ -213,10 +216,13 @@ export default function CalendarScreen() {
               </Text>
             </View>
           ) : (
-            selectedReminders.map((reminder) => (
-              <View key={reminder.id} style={styles.reminderCard}>
-                <View style={styles.timeBadge}>
-                  <Text style={styles.timeText}>{formatTime(reminder.startAt)}</Text>
+            selectedReminders.map((reminder) => {
+              const overdue = isReminderOverdue(reminder);
+
+              return (
+              <View key={reminder.id} style={[styles.reminderCard, overdue && styles.reminderCardOverdue]}>
+                <View style={[styles.timeBadge, overdue && styles.timeBadgeOverdue]}>
+                  <Text style={[styles.timeText, overdue && styles.timeTextOverdue]}>{formatTime(reminder.startAt)}</Text>
                 </View>
 
                 <View style={{ flex: 1 }}>
@@ -233,6 +239,10 @@ export default function CalendarScreen() {
                       {getCategoryLabel(reminder.schedule?.category)}
                     </Text>
 
+                    {overdue ? (
+                      <Text style={styles.overduePill}>{formatOverdueLabel(reminder.startAt)}</Text>
+                    ) : null}
+
                     {reminder.schedule?.title ? (
                       <Text style={styles.scheduleText} numberOfLines={1}>
                         {reminder.schedule.title}
@@ -241,7 +251,8 @@ export default function CalendarScreen() {
                   </View>
                 </View>
               </View>
-            ))
+              );
+            })
           )}
         </ScrollView>
       )}
@@ -341,6 +352,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#EAECF0"
   },
+  reminderCardOverdue: {
+    backgroundColor: "#FFF7F8",
+    borderColor: "#FECDD6"
+  },
   timeBadge: {
     width: 66,
     height: 48,
@@ -349,9 +364,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
+  timeBadgeOverdue: {
+    backgroundColor: "#FFF1F2"
+  },
   timeText: {
     color: "#2563EB",
     fontWeight: "900"
+  },
+  timeTextOverdue: {
+    color: "#E11D48"
   },
   reminderTitle: {
     color: "#101828",
@@ -377,6 +398,15 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     fontSize: 12,
     fontWeight: "800"
+  },
+  overduePill: {
+    backgroundColor: "#FFF1F2",
+    color: "#E11D48",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: "900"
   },
   scheduleText: {
     color: "#667085",
