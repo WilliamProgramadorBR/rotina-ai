@@ -29,8 +29,8 @@ function getBestDay(weekly: DashboardMetrics["weekly"]): string {
 }
 
 function getAchievementTone(rate: number): { color: string; label: string; icon: string } {
-  if (rate >= 0.8) return { color: colors.success, label: "Excelente semana!", icon: "trophy-outline" };
-  if (rate >= 0.5) return { color: colors.warning, label: "Boa evolução!", icon: "trending-up" };
+  if (rate >= 80) return { color: colors.success, label: "Excelente semana!", icon: "trophy-outline" };
+  if (rate >= 50) return { color: colors.warning, label: "Boa evolução!", icon: "trending-up" };
   return { color: colors.danger, label: "Semana com desafios", icon: "alert-circle-outline" };
 }
 
@@ -40,7 +40,7 @@ function buildWeeklyPlanPrompt(
   bestDay: string,
   bestCategory: string | null
 ) {
-  const completion = Math.round(weekRate * 100);
+  const completion = Math.round(weekRate);
 
   if (!metrics) {
     return "Planeje minha proxima semana com uma rotina simples, realista e com lembretes diarios equilibrados.";
@@ -119,7 +119,7 @@ export default function WeeklyReviewScreen() {
                     {achievement.label}
                   </Text>
                   <Text style={[styles.heroRate, { color: theme.text, fontSize: scaledFont(32, width) }]}>
-                    {Math.round(weekRate * 100)}%
+                    {Math.round(weekRate)}%
                   </Text>
                   <Text style={[styles.heroDesc, { color: theme.textMuted, fontSize: scaledFont(13, width) }]}>
                     de conclusão esta semana
@@ -190,10 +190,10 @@ export default function WeeklyReviewScreen() {
 
               <View style={[styles.barChart, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                 {(metrics?.weekly || []).map((day) => {
-                  const barH = Math.max(day.completionRate * 100, 4);
-                  const barColor = day.completionRate >= 0.8
+                  const barH = Math.max(day.completionRate, 4);
+                  const barColor = day.completionRate >= 80
                     ? colors.success
-                    : day.completionRate >= 0.5
+                    : day.completionRate >= 50
                     ? colors.warning
                     : day.completionRate > 0
                     ? colors.danger
@@ -201,7 +201,7 @@ export default function WeeklyReviewScreen() {
                   return (
                     <View key={day.date} style={styles.barCol}>
                       <Text style={[styles.barPct, { color: theme.textMuted, fontSize: scaledFont(10, width) }]}>
-                        {day.completionRate > 0 ? `${Math.round(day.completionRate * 100)}%` : ""}
+                        {day.completionRate > 0 ? `${Math.round(day.completionRate)}%` : ""}
                       </Text>
                       <View style={[styles.barTrack, { backgroundColor: theme.border }]}>
                         <View style={[styles.barFill, { height: barH, backgroundColor: barColor }]} />
@@ -246,9 +246,9 @@ export default function WeeklyReviewScreen() {
                   </Text>
                 </View>
                 <Text style={[styles.suggestionText, { color: theme.textMuted, fontSize: scaledFont(13, width) }]}>
-                  {weekRate >= 0.8
+                  {weekRate >= 80
                     ? "Você está indo muito bem! Para evoluir, tente adicionar um novo hábito a partir de segunda-feira."
-                    : weekRate >= 0.5
+                    : weekRate >= 50
                     ? "Você completou mais da metade! Tente reduzir blocos de 2h para 45min — é mais fácil de manter o foco."
                     : "Comece pequeno: adicione apenas 2 ou 3 atividades por dia e aumente gradualmente ao longo das semanas."}
                 </Text>

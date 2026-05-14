@@ -9,7 +9,7 @@ const DEFAULT_API_URL =
   process.env.EXPO_PUBLIC_API_URL ||
   (Platform.OS === "web"
     ? "http://localhost:3333"
-    : "https://ruling-strategic-dry-bio.trycloudflare.com");
+    : "https://occupations-minds-transformation-machinery.trycloudflare.com");
 
 const LEGACY_API_URLS = new Set([
   "https://smoking-context-population-tramadol.trycloudflare.com",
