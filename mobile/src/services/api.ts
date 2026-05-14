@@ -4,22 +4,36 @@ import * as SecureStore from "expo-secure-store";
 
 export const TOKEN_KEY = "rotina-ai-token";
 export const API_URL_KEY = "rotina-ai-api-url";
+const SERVER_API_URL = "https://workflow-abroad-pointing-sunday.trycloudflare.com";
 
 const DEFAULT_API_URL =
-  process.env.EXPO_PUBLIC_API_URL ||
-  (Platform.OS === "web"
-    ? "http://localhost:3333"
-    : "https://occupations-minds-transformation-machinery.trycloudflare.com");
+  process.env.EXPO_PUBLIC_API_URL && !isLocalApiBaseUrl(process.env.EXPO_PUBLIC_API_URL)
+    ? normalizeApiBaseUrl(process.env.EXPO_PUBLIC_API_URL)
+    : SERVER_API_URL;
 
 const LEGACY_API_URLS = new Set([
   "https://smoking-context-population-tramadol.trycloudflare.com",
-  "https://grand-short-adware-invision.trycloudflare.com"
+  "https://grand-short-adware-invision.trycloudflare.com",
+  "https://occupations-minds-transformation-machinery.trycloudflare.com",
+  "http://localhost:3333",
+  "http://127.0.0.1:3333",
+  "http://0.0.0.0:3333",
+  "http://10.0.2.2:3333"
 ]);
 
 const DEFAULT_TIMEOUT_MS = 30000;
 const AI_TIMEOUT_MS = 180000;
 const ENABLE_API_DEBUG_LOGS = __DEV__ && process.env.EXPO_PUBLIC_DEBUG_API === "true";
 let cachedApiBaseUrl: string | null = null;
+
+const PUBLIC_ENDPOINTS = new Set([
+  "/auth/login",
+  "/auth/register",
+  "/auth/forgot-password",
+  "/auth/verify-reset-code",
+  "/auth/reset-password",
+  "/health"
+]);
 
 function debugApiLog(message: string, details?: unknown) {
   if (ENABLE_API_DEBUG_LOGS) {
@@ -52,10 +66,21 @@ function normalizeApiBaseUrl(url: string) {
   return url.trim().replace(/\/+$/, "");
 }
 
+function isLocalApiBaseUrl(url: string | null) {
+  if (!url) return false;
+
+  try {
+    const parsedUrl = new URL(normalizeApiBaseUrl(url));
+    return ["localhost", "127.0.0.1", "0.0.0.0", "10.0.2.2"].includes(parsedUrl.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function isLegacyApiBaseUrl(url: string | null) {
   if (!url) return false;
 
-  return LEGACY_API_URLS.has(normalizeApiBaseUrl(url));
+  return LEGACY_API_URLS.has(normalizeApiBaseUrl(url)) || isLocalApiBaseUrl(url);
 }
 
 function assertValidApiBaseUrl(url: string) {
@@ -71,7 +96,7 @@ function assertValidApiBaseUrl(url: string) {
     parsedUrl.protocol === "http:" &&
     ["localhost", "127.0.0.1"].includes(parsedUrl.hostname);
 
-  if (parsedUrl.protocol !== "https:" && !isLocalHttp) {
+  if (parsedUrl.protocol !== "https:" && !(__DEV__ && isLocalHttp)) {
     throw new Error("Use uma URL HTTPS para proteger os dados em transito.");
   }
 }
@@ -104,7 +129,9 @@ export async function getApiBaseUrl(): Promise<string> {
   const baseUrl = shouldUseDefault ? DEFAULT_API_URL : savedUrl;
 
   if (savedUrl && shouldUseDefault) {
-    await saveApiBaseUrl(DEFAULT_API_URL);
+    saveApiBaseUrl(DEFAULT_API_URL).catch((error) => {
+      debugApiLog("[API URL] Nao foi possivel persistir a URL padrao:", error);
+    });
   }
 
   cachedApiBaseUrl = baseUrl;
@@ -208,10 +235,92 @@ export function setApiToken(token: string | null) {
   setAuthToken(token);
 }
 
+function getRequestPath(url?: string) {
+  if (!url) return "";
+
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return url.split("?")[0];
+  }
+}
+
+function isPublicEndpoint(url?: string) {
+  return PUBLIC_ENDPOINTS.has(getRequestPath(url));
+}
+
+function hasAuthorizationHeader(headers: any) {
+  if (!headers) return false;
+
+  if (typeof headers.has === "function") {
+    return headers.has("Authorization") || headers.has("authorization");
+  }
+
+  return Boolean(headers.Authorization || headers.authorization);
+}
+
+function setAuthorizationHeader(headers: any, token: string) {
+  if (typeof headers.set === "function") {
+    headers.set("Authorization", `Bearer ${token}`);
+    return;
+  }
+
+  headers.Authorization = `Bearer ${token}`;
+}
+
+function clearAuthorizationHeader(headers: any) {
+  if (!headers) return;
+
+  if (typeof headers.delete === "function") {
+    headers.delete("Authorization");
+    headers.delete("authorization");
+  }
+
+  delete headers.Authorization;
+  delete headers.authorization;
+}
+
+export function isApiNetworkError(error: unknown) {
+  const axiosError = error as AxiosError<any>;
+
+  if (axiosError?.response) {
+    return false;
+  }
+
+  const code = String(axiosError?.code || "").toUpperCase();
+  const message = String(axiosError?.message || error || "").toLowerCase();
+
+  return (
+    code === "ERR_NETWORK" ||
+    code === "ECONNABORTED" ||
+    code === "ETIMEDOUT" ||
+    message.includes("network error") ||
+    message.includes("network request failed") ||
+    message.includes("failed to fetch") ||
+    message.includes("timeout") ||
+    message.includes("unable to verify the first certificate")
+  );
+}
+
 /**
  * Helper específico para chamadas de IA.
  * Essas rotas podem demorar mais que uma request comum.
  */
+export async function postPublic<T>(path: string, payload: unknown) {
+  const baseURL = await getApiBaseUrl();
+
+  return axios.post<T>(`${baseURL}${path}`, payload, {
+    timeout: DEFAULT_TIMEOUT_MS,
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json"
+    },
+    transitional: {
+      clarifyTimeoutError: true
+    }
+  });
+}
+
 export async function postAiScheduleSuggest(payload: {
   prompt: string;
   startDate?: string;
@@ -226,13 +335,17 @@ api.interceptors.request.use(
   async (config) => {
     config.baseURL = await getApiBaseUrl();
 
-    const alreadyHasAuthorization = Boolean(config.headers?.Authorization);
+    if (isPublicEndpoint(config.url)) {
+      clearAuthorizationHeader(config.headers);
+    } else {
+      const alreadyHasAuthorization = hasAuthorizationHeader(config.headers);
 
-    if (!alreadyHasAuthorization) {
-      const token = await getAuthToken();
+      if (!alreadyHasAuthorization) {
+        const token = await getAuthToken();
 
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+        if (token) {
+          setAuthorizationHeader(config.headers, token);
+        }
       }
     }
 
@@ -245,8 +358,8 @@ api.interceptors.request.use(
       fullUrl,
       method: config.method,
       timeout: config.timeout,
-      hasAuthorization: Boolean(config.headers?.Authorization),
-      authorizationPreview: config.headers?.Authorization
+      hasAuthorization: hasAuthorizationHeader(config.headers),
+      authorizationPreview: hasAuthorizationHeader(config.headers)
         ? "Bearer ***"
         : "SEM TOKEN"
     });

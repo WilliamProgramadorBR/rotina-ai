@@ -19,6 +19,9 @@ export type Schedule = {
   id: string;
   title: string;
   description?: string | null;
+  notes?: string | null;
+  linksJson?: string | null;
+  extraInfo?: string | null;
   category: ScheduleCategory;
   sourceType?: "MANUAL" | "AI_PROMPT" | "MEDICAL_IMAGE" | "IMPORTED_TEXT";
   reminders?: Reminder[];
@@ -38,6 +41,11 @@ export type Reminder = {
   scheduleId?: string;
   title: string;
   description?: string | null;
+  notes?: string | null;
+  linksJson?: string | null;
+  location?: string | null;
+  priority?: "LOW" | "NORMAL" | "HIGH" | "CRITICAL" | string | null;
+  alarmLevel?: "LEVE" | "IMPORTANTE" | "CRITICO" | "ROTINA" | string | null;
   startAt: string;
   endAt?: string | null;
   recurrenceRule?: string | null;

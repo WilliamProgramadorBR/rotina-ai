@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { api } from "../src/services/api";
+import { createReminderLogRequest } from "../src/services/reminders";
 import { colors, fonts, radius, shadow, spacing, scaledFont } from "../src/theme";
 import { useThemeMode } from "../src/context/ThemeContext";
 import { useResponsive } from "../src/hooks/useResponsive";
@@ -89,16 +89,25 @@ export default function FocoScreen() {
     setIsFinished(true);
     if (params.reminderId) {
       try {
-        await api.post(`/reminders/${params.reminderId}/log`, {
+        const result = await createReminderLogRequest(params.reminderId, {
           action: "DONE",
           note: `Concluído via Modo Foco (${mode === "POMODORO" ? "Pomodoro 25min" : `${customMinutes}min livre`}).`
         });
+
+        if (result.queued) {
+          Alert.alert("Foco concluido offline", "A conclusao sera sincronizada quando a internet voltar.", [
+            { text: "Ver Meu Dia", onPress: () => router.replace("/meu-dia") },
+            { text: "Fechar", onPress: () => router.back() }
+          ]);
+          return;
+        }
+
         Alert.alert("Parabéns!", "Atividade concluída e registrada.", [
           { text: "Ver Meu Dia", onPress: () => router.replace("/meu-dia") },
           { text: "Fechar", onPress: () => router.back() }
         ]);
       } catch {
-        Alert.alert("Foco concluído", "Atividade registrada localmente.", [
+        Alert.alert("Erro", "Nao foi possivel registrar a conclusao.", [
           { text: "OK", onPress: () => router.back() }
         ]);
       }

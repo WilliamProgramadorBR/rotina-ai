@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, AppState, View } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as Notifications from "expo-notifications";
@@ -19,6 +19,7 @@ import { ThemeProvider, useThemeMode } from "../src/context/ThemeContext";
 import { AppUpdateInstaller } from "../src/components/AppUpdateInstaller";
 import { configureAlarmNotifications } from "../src/services/alarmNotifications";
 import { openAlarmFromNotificationResponse } from "../src/services/alarmNavigation";
+import { flushOfflineQueue } from "../src/services/offlineSync";
 import { colors } from "../src/theme";
 
 function AlarmNotificationObserver() {
@@ -37,6 +38,43 @@ function AlarmNotificationObserver() {
     });
 
     return () => subscription.remove();
+  }, []);
+
+  return null;
+}
+
+function OfflineSyncObserver() {
+  useEffect(() => {
+    let active = true;
+
+    async function sync() {
+      if (!active) return;
+
+      try {
+        const result = await flushOfflineQueue();
+
+        if (result.synced > 0) {
+          console.log("[OFFLINE SYNC] Sincronizado", result);
+        }
+      } catch (error) {
+        console.log("[OFFLINE SYNC ERROR]", error);
+      }
+    }
+
+    sync();
+
+    const interval = setInterval(sync, 30_000);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        sync();
+      }
+    });
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+      subscription.remove();
+    };
   }, []);
 
   return null;
@@ -74,6 +112,7 @@ function RootLayoutContent() {
   return (
     <AuthProvider>
       <AlarmNotificationObserver />
+      <OfflineSyncObserver />
       <AppUpdateInstaller />
       <StatusBar style={isDark ? "light" : "dark"} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background } }} />

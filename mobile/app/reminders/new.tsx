@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { api } from "../../src/services/api";
 import { colors, fonts, radius, spacing } from "../../src/theme";
 import { toLocalInputDateTime } from "../../src/utils/date";
 import { Button, Card, Input } from "../../src/components/ui";
@@ -11,7 +10,10 @@ import { useThemeMode } from "../../src/context/ThemeContext";
 import { useResponsive } from "../../src/hooks/useResponsive";
 import { IconSymbol } from "../../src/components/IconSymbol";
 import { scheduleReminderAlarm } from "../../src/services/alarmNotifications";
+import { createReminderOfflineSafeRequest } from "../../src/services/reminders";
 import type { AlarmLevel } from "../../src/types/api";
+
+type Priority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
 
 const ALARM_LEVELS: Array<{ id: AlarmLevel; label: string; desc: string; icon: string; color: string; bg: string }> = [
   { id: "LEVE", label: "Leve", desc: "Notificação simples", icon: "bell-outline", color: colors.success, bg: colors.successSoft },
@@ -20,6 +22,20 @@ const ALARM_LEVELS: Array<{ id: AlarmLevel; label: string; desc: string; icon: s
   { id: "ROTINA", label: "Rotina", desc: "Lembrete suave recorrente", icon: "water-outline", color: "#0284C7", bg: "#E0F2FE" }
 ];
 
+const PRIORITIES: Array<{ id: Priority; label: string; desc: string; icon: string; color: string; bg: string }> = [
+  { id: "LOW", label: "Baixa", desc: "Pode esperar", icon: "leaf", color: colors.success, bg: colors.successSoft },
+  { id: "NORMAL", label: "Normal", desc: "Ritmo padrao", icon: "flag-outline", color: colors.primary, bg: colors.primarySoft },
+  { id: "HIGH", label: "Alta", desc: "Precisa atencao", icon: "flag", color: colors.warning, bg: colors.warningSoft },
+  { id: "CRITICAL", label: "Critica", desc: "Nao deixar passar", icon: "alert-octagon-outline", color: colors.danger, bg: colors.dangerSoft }
+];
+
+function parseLinks(value: string) {
+  return value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export default function NewReminderScreen() {
   const { theme } = useThemeMode();
   const { width } = useResponsive();
@@ -27,8 +43,12 @@ export default function NewReminderScreen() {
   const [scheduleId, setScheduleId] = useState(params.scheduleId || "");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [notes, setNotes] = useState("");
+  const [linksText, setLinksText] = useState("");
+  const [location, setLocation] = useState("");
   const [dateTime, setDateTime] = useState(toLocalInputDateTime(new Date(Date.now() + 10 * 60 * 1000)));
   const [alarmLevel, setAlarmLevel] = useState<AlarmLevel>("IMPORTANTE");
+  const [priority, setPriority] = useState<Priority>("NORMAL");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -44,16 +64,29 @@ export default function NewReminderScreen() {
 
       setIsSubmitting(true);
 
-      const response = await api.post("/reminders", {
+      const result = await createReminderOfflineSafeRequest({
         scheduleId,
         title: title.trim(),
         description: description.trim() || undefined,
+        notes: notes.trim() || undefined,
+        links: parseLinks(linksText),
+        location: location.trim() || undefined,
+        priority,
         startAt: new Date(dateTime).toISOString(),
         timezone: "America/Sao_Paulo",
         alarmLevel
       });
 
-      const createdReminder = response.data.reminder;
+      if (result.queued || !result.reminder) {
+        Alert.alert(
+          "Lembrete salvo offline",
+          "A tarefa sera sincronizada automaticamente quando a internet voltar. O alarme sera agendado depois da sincronizacao."
+        );
+        router.back();
+        return;
+      }
+
+      const createdReminder = result.reminder;
 
       await scheduleReminderAlarm({
         reminderId: createdReminder.id,
@@ -100,7 +133,67 @@ export default function NewReminderScreen() {
             <Input label="ID do cronograma" placeholder="ID do cronograma" value={scheduleId} onChangeText={setScheduleId} editable={!params.scheduleId} />
             <Input label="Título" placeholder="Ex: Tomar remédio" value={title} onChangeText={setTitle} />
             <Input label="Descrição" placeholder="Ex: Tomar após alimentação" value={description} onChangeText={setDescription} multiline />
+            <Input
+              label="Observacoes da tarefa"
+              placeholder="Ex: conferir pressao antes, separar material, levar documento..."
+              value={notes}
+              onChangeText={setNotes}
+              multiline
+              hint={`${notes.length}/300`}
+              maxLength={300}
+            />
+            <Input
+              label="Links uteis"
+              placeholder={"Cole um link por linha"}
+              value={linksText}
+              onChangeText={setLinksText}
+              multiline
+              autoCapitalize="none"
+              autoCorrect={false}
+              hint="Materiais, videoaulas, documentos ou referencias."
+            />
+            <Input
+              label="Local"
+              placeholder="Ex: academia, escritorio, farmacia..."
+              value={location}
+              onChangeText={setLocation}
+            />
             <Input label="Data e hora" placeholder="YYYY-MM-DDTHH:mm" value={dateTime} onChangeText={setDateTime} />
+
+            <View style={styles.levelSection}>
+              <Text style={[styles.levelLabel, { color: theme.text }]}>Prioridade</Text>
+              <View style={styles.levelGrid}>
+                {PRIORITIES.map((item) => {
+                  const active = priority === item.id;
+                  return (
+                    <Pressable
+                      key={item.id}
+                      style={[
+                        styles.levelCard,
+                        { backgroundColor: theme.surface, borderColor: theme.border },
+                        active && { backgroundColor: item.bg, borderColor: item.color }
+                      ]}
+                      onPress={() => setPriority(item.id)}
+                    >
+                      <View style={[styles.levelIconBox, { backgroundColor: active ? `${item.color}20` : theme.surfaceMuted }]}>
+                        <IconSymbol name={item.icon as any} size={16} color={active ? item.color : theme.textMuted} />
+                      </View>
+                      <View style={styles.levelTextBox}>
+                        <Text style={[styles.levelCardTitle, { color: active ? item.color : theme.text }]}>
+                          {item.label}
+                        </Text>
+                        <Text style={[styles.levelCardDesc, { color: active ? item.color : theme.textMuted }]}>
+                          {item.desc}
+                        </Text>
+                      </View>
+                      {active && (
+                        <IconSymbol name="check-circle" size={16} color={item.color} />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
 
             {/* Seletor de nível de alarme */}
             <View style={styles.levelSection}>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -9,13 +9,28 @@ import {
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Notifications from "expo-notifications";
-import { api } from "../src/services/api";
 import { useThemeMode } from "../src/context/ThemeContext";
 import { scheduleSnoozeAlarm } from "../src/services/alarmNotifications";
+import { createReminderLogRequest, snoozeReminderRequest } from "../src/services/reminders";
 import { playAlarmRingtone, stopAlarmRingtone } from "../src/services/customRingtone";
 import { colors, spacing } from "../src/theme";
 
 type AlarmAction = "DONE" | "SNOOZED" | "SKIPPED";
+
+function getActionFromNotification(value: string): AlarmAction | null {
+  switch (value) {
+    case "DONE":
+      return "DONE";
+    case "SNOOZE":
+    case "SNOOZED":
+      return "SNOOZED";
+    case "SKIP":
+    case "SKIPPED":
+      return "SKIPPED";
+    default:
+      return null;
+  }
+}
 
 function getSafeString(value: string | string[] | undefined, fallback = "") {
   if (Array.isArray(value)) {
@@ -53,6 +68,7 @@ export default function AlarmActiveScreen() {
   const isTestAlarm = reminderId === "test-alarm";
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const handledNotificationActionRef = useRef(false);
 
   const timeLabel = useMemo(() => formatAlarmTime(startAt), [startAt]);
 
@@ -97,32 +113,46 @@ export default function AlarmActiveScreen() {
         return;
       }
 
-      await api.post(`/reminders/${reminderId}/log`, {
-        action,
-        note:
-          action === "DONE"
-            ? "Marcado como feito pela tela de alarme."
-            : action === "SNOOZED"
-              ? "Adiado pela tela de alarme."
-              : "Pulado pela tela de alarme."
-      });
-
       if (action === "SNOOZED") {
-        await scheduleSnoozeAlarm(
+        const result = await snoozeReminderRequest(
           {
-            reminderId,
+            id: reminderId,
             title,
             description,
             startAt,
-            scheduleTitle
+            alarmLevel: undefined,
+            schedule: scheduleTitle ? { title: scheduleTitle } : null
           },
           10
         );
 
-        Alert.alert("Soneca ativada", "Vou te lembrar novamente em 10 minutos.");
+        Alert.alert(
+          result.queued ? "Soneca offline" : "Soneca ativada",
+          result.queued
+            ? "A soneca foi salva localmente e sera sincronizada quando a internet voltar."
+            : result.alarmScheduled
+            ? "Vou te lembrar novamente em 10 minutos."
+            : "A tarefa foi adiada, mas nao consegui agendar a notificacao local."
+        );
+
+        router.replace("/home");
+        return;
+      }
+
+      const result = await createReminderLogRequest(reminderId, {
+        action,
+        note:
+          action === "DONE"
+            ? "Marcado como feito pela tela de alarme."
+            : "Pulado pela tela de alarme."
+      });
+
+      if (result.queued) {
+        Alert.alert("Salvo offline", "A acao sera sincronizada quando a internet voltar.");
       }
 
       router.replace("/home");
+      return;
     } catch (error: any) {
       console.log("[ALARM ACTION ERROR]", error?.response?.data || error);
 
@@ -134,6 +164,17 @@ export default function AlarmActiveScreen() {
       setIsSubmitting(false);
     }
   }
+
+  useEffect(() => {
+    const action = getActionFromNotification(notificationAction);
+
+    if (!action || handledNotificationActionRef.current) {
+      return;
+    }
+
+    handledNotificationActionRef.current = true;
+    registerAction(action);
+  }, [notificationAction]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -162,12 +203,6 @@ export default function AlarmActiveScreen() {
           <View style={[styles.schedulePill, { backgroundColor: theme.surfaceMuted }]}>
             <Text style={[styles.schedulePillText, { color: theme.text }]}>{scheduleTitle}</Text>
           </View>
-        ) : null}
-
-        {notificationAction && notificationAction !== "expo.modules.notifications.actions.DEFAULT" ? (
-          <Text style={[styles.smallInfo, { color: theme.textMuted }]}>
-            Ação recebida: {notificationAction}
-          </Text>
         ) : null}
 
         <View style={styles.actions}>
@@ -278,11 +313,6 @@ const styles = StyleSheet.create({
   schedulePillText: {
     color: colors.text,
     fontWeight: "800"
-  },
-  smallInfo: {
-    marginTop: spacing.md,
-    color: colors.textMuted,
-    fontSize: 12
   },
   actions: {
     width: "100%",

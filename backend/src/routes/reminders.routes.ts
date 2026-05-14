@@ -17,6 +17,13 @@ const reminderPrioritySchema = z.enum([
   "CRITICAL"
 ]);
 
+const alarmLevelSchema = z.enum([
+  "LEVE",
+  "IMPORTANTE",
+  "CRITICO",
+  "ROTINA"
+]);
+
 const reminderStatusSchema = z.enum([
   "ACTIVE",
   "PAUSED",
@@ -45,6 +52,30 @@ function normalizeLinks(links?: string[]) {
   }
 
   return JSON.stringify(cleanedLinks);
+}
+
+function normalizePatchLinks(links?: string[] | null) {
+  if (typeof links === "undefined") {
+    return undefined;
+  }
+
+  if (!links || links.length === 0) {
+    return null;
+  }
+
+  const cleanedLinks = links
+    .map((link) => link.trim())
+    .filter(Boolean);
+
+  if (cleanedLinks.length === 0) {
+    return null;
+  }
+
+  return JSON.stringify(cleanedLinks);
+}
+
+function hasField<T extends object>(data: T, field: keyof T) {
+  return Object.prototype.hasOwnProperty.call(data, field);
 }
 
 export async function remindersRoutes(app: FastifyInstance) {
@@ -149,6 +180,7 @@ export async function remindersRoutes(app: FastifyInstance) {
       links: z.array(z.string()).optional(),
       location: z.string().optional(),
       priority: reminderPrioritySchema.optional(),
+      alarmLevel: alarmLevelSchema.optional(),
 
       startAt: z.string().datetime(),
       endAt: z.string().datetime().optional(),
@@ -182,6 +214,7 @@ export async function remindersRoutes(app: FastifyInstance) {
         linksJson: normalizeLinks(data.links),
         location: data.location,
         priority: data.priority || "NORMAL",
+        alarmLevel: data.alarmLevel || "IMPORTANTE",
 
         startAt: new Date(data.startAt),
         endAt: data.endAt ? new Date(data.endAt) : undefined,
@@ -201,6 +234,80 @@ export async function remindersRoutes(app: FastifyInstance) {
     return reply.status(201).send({
       reminder: decryptReminder(reminder)
     });
+  });
+
+  app.patch("/:id", async (request, reply) => {
+    const paramsSchema = z.object({
+      id: z.string()
+    });
+
+    const bodySchema = z.object({
+      title: z.string().min(2).optional(),
+      description: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+      links: z.array(z.string()).nullable().optional(),
+      location: z.string().nullable().optional(),
+      priority: reminderPrioritySchema.nullable().optional(),
+      alarmLevel: alarmLevelSchema.optional(),
+      startAt: z.string().datetime().optional(),
+      endAt: z.string().datetime().nullable().optional(),
+      recurrenceRule: z.string().nullable().optional(),
+      timezone: z.string().optional()
+    }).refine((data) => Object.keys(data).length > 0, {
+      message: "Informe ao menos um campo para atualizar."
+    });
+
+    const { id } = paramsSchema.parse(request.params);
+    const data = bodySchema.parse(request.body);
+    const userId = request.user.sub;
+
+    const reminder = await prisma.reminder.findFirst({
+      where: {
+        id,
+        schedule: {
+          userId
+        }
+      }
+    });
+
+    if (!reminder) {
+      return reply.status(404).send({
+        message: "Lembrete nÃ£o encontrado."
+      });
+    }
+
+    const updateData: Record<string, any> = {};
+
+    if (hasField(data, "title")) updateData.title = data.title?.trim();
+    if (hasField(data, "description")) updateData.description = data.description?.trim() || null;
+    if (hasField(data, "notes")) updateData.notes = data.notes?.trim() || null;
+    if (hasField(data, "links")) updateData.linksJson = normalizePatchLinks(data.links);
+    if (hasField(data, "location")) updateData.location = data.location?.trim() || null;
+    if (hasField(data, "priority")) updateData.priority = data.priority || "NORMAL";
+    if (hasField(data, "alarmLevel")) updateData.alarmLevel = data.alarmLevel;
+    if (hasField(data, "startAt") && data.startAt) updateData.startAt = new Date(data.startAt);
+    if (hasField(data, "endAt")) updateData.endAt = data.endAt ? new Date(data.endAt) : null;
+    if (hasField(data, "recurrenceRule")) updateData.recurrenceRule = data.recurrenceRule?.trim() || null;
+    if (hasField(data, "timezone")) updateData.timezone = data.timezone?.trim() || "America/Sao_Paulo";
+
+    const updatedReminder = await prisma.reminder.update({
+      where: {
+        id
+      },
+      data: encryptReminderData(updateData),
+      include: {
+        schedule: true,
+        logs: {
+          orderBy: {
+            createdAt: "desc"
+          }
+        }
+      }
+    });
+
+    return {
+      reminder: decryptReminder(updatedReminder)
+    };
   });
 
   app.post("/:id/log", async (request, reply) => {

@@ -11,13 +11,13 @@ import {
   useWindowDimensions
 } from "react-native";
 import { router } from "expo-router";
-import { api } from "../../src/services/api";
 import { colors, fonts, getCategoryMeta, radius, spacing } from "../../src/theme";
 import { Button, Card, Input, SectionTitle } from "../../src/components/ui";
 import { PageHeader } from "../../src/components/PageHeader";
 import { ScreenLayout } from "../../src/components/ScreenLayout";
 import { useThemeMode } from "../../src/context/ThemeContext";
 import { useResponsive } from "../../src/hooks/useResponsive";
+import { createScheduleOfflineSafeRequest } from "../../src/services/schedules";
 
 type Category = "HEALTH" | "STUDY" | "WORKOUT" | "WORK" | "SLEEP" | "WATER" | "PERSONAL" | "OTHER";
 type Priority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
@@ -141,7 +141,7 @@ export default function NewScheduleScreen() {
 
       setIsSubmitting(true);
 
-      await api.post("/schedules", {
+      const result = await createScheduleOfflineSafeRequest({
         title: title.trim(),
         description: description.trim() || undefined,
         notes: notes.trim() || undefined,
@@ -151,8 +151,15 @@ export default function NewScheduleScreen() {
         sourceType: "MANUAL"
       });
 
-      Alert.alert("Cronograma criado", "Agora você pode adicionar lembretes a esta rotina.");
+      Alert.alert(
+        result.queued ? "Cronograma salvo offline" : "Cronograma criado",
+        result.queued
+          ? "Ele sera sincronizado automaticamente quando a internet voltar."
+          : "Agora voce pode adicionar lembretes a esta rotina."
+      );
       router.replace("/schedules");
+      return;
+
     } catch (error: any) {
       console.log("[CREATE SCHEDULE ERROR]", error?.response?.data || error);
       Alert.alert("Erro", error?.response?.data?.message || "Não foi possível criar o cronograma.");

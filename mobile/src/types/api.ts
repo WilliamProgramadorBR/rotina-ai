@@ -44,6 +44,9 @@ export type Schedule = {
   userId: string;
   title: string;
   description?: string | null;
+  notes?: string | null;
+  linksJson?: string | null;
+  extraInfo?: string | null;
   category: ScheduleCategory;
   sourceType: ScheduleSourceType;
   createdAt: string;
@@ -76,6 +79,8 @@ export type Reminder = {
   scheduleId: string;
   title: string;
   description?: string | null;
+  notes?: string | null;
+  linksJson?: string | null;
   startAt: string;
   endAt?: string | null;
   recurrenceRule?: string | null;

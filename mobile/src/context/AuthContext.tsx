@@ -6,7 +6,10 @@ import React, {
   useMemo,
   useState
 } from "react";
-import { api, getAuthToken, removeAuthToken, saveAuthToken, setAuthToken } from "../services/api";
+import { Platform } from "react-native";
+import * as SecureStore from "expo-secure-store";
+import { api, getAuthToken, isApiNetworkError, postPublic, removeAuthToken, saveAuthToken, setAuthToken } from "../services/api";
+import { STORAGE_KEYS } from "../constants/storage";
 
 const ENABLE_AUTH_DEBUG_LOGS = __DEV__ && process.env.EXPO_PUBLIC_DEBUG_AUTH === "true";
 
@@ -40,6 +43,57 @@ type AuthContextData = {
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
+function canUseLocalStorage() {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.localStorage !== "undefined"
+  );
+}
+
+async function saveCachedUser(user: User) {
+  const raw = JSON.stringify(user);
+
+  if (Platform.OS === "web") {
+    if (canUseLocalStorage()) {
+      window.localStorage.setItem(STORAGE_KEYS.USER, raw);
+    }
+    return;
+  }
+
+  await SecureStore.setItemAsync(STORAGE_KEYS.USER, raw);
+}
+
+async function getCachedUser() {
+  try {
+    const raw = Platform.OS === "web"
+      ? canUseLocalStorage()
+        ? window.localStorage.getItem(STORAGE_KEYS.USER)
+        : null
+      : await SecureStore.getItemAsync(STORAGE_KEYS.USER);
+
+    if (!raw) return null;
+
+    return JSON.parse(raw) as User;
+  } catch {
+    return null;
+  }
+}
+
+async function removeCachedUser() {
+  try {
+    if (Platform.OS === "web") {
+      if (canUseLocalStorage()) {
+        window.localStorage.removeItem(STORAGE_KEYS.USER);
+      }
+      return;
+    }
+
+    await SecureStore.deleteItemAsync(STORAGE_KEYS.USER);
+  } catch (error) {
+    debugAuthLog("[AUTH] Nao foi possivel limpar usuario em cache.", error);
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setTokenState] = useState<string | null>(null);
@@ -51,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     await saveAuthToken(data.token);
+    await saveCachedUser(data.user);
 
     setAuthToken(data.token);
     setTokenState(data.token);
@@ -74,14 +129,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthToken(storedToken);
     setTokenState(storedToken);
 
+    const cachedUser = await getCachedUser();
+
+    if (cachedUser) {
+      setUser(cachedUser);
+    }
+
     try {
       const response = await api.get("/auth/me");
 
       setUser(response.data.user);
+      await saveCachedUser(response.data.user);
     } catch (error) {
+      if (isApiNetworkError(error)) {
+        debugAuthLog("[AUTH] Offline. Mantendo sessao em cache.");
+        setUser(cachedUser || {
+          id: "offline-user",
+          name: "Usuario",
+          email: ""
+        });
+        return;
+      }
+
       debugAuthLog("[AUTH] Token invalido ou sessao expirada. Limpando sessao.");
 
       await removeAuthToken();
+      await removeCachedUser();
 
       setTokenState(null);
       setUser(null);
@@ -90,7 +163,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = useCallback(
     async (email: string, password: string) => {
-      const response = await api.post<AuthResponse>("/auth/login", {
+      setAuthToken(null);
+      setTokenState(null);
+      setUser(null);
+
+      const response = await postPublic<AuthResponse>("/auth/login", {
         email,
         password
       });
@@ -107,7 +184,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = useCallback(
     async (name: string, email: string, password: string) => {
-      const response = await api.post<AuthResponse>("/auth/register", {
+      setAuthToken(null);
+      setTokenState(null);
+      setUser(null);
+
+      const response = await postPublic<AuthResponse>("/auth/register", {
         name,
         email,
         password
@@ -125,6 +206,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     await removeAuthToken();
+    await removeCachedUser();
 
     setTokenState(null);
     setUser(null);

@@ -22,6 +22,7 @@ import { PageHeader } from "../src/components/PageHeader";
 import { IconSymbol } from "../src/components/IconSymbol";
 import { LoadingState } from "../src/components/LoadingState";
 import { ReminderCard } from "../src/components/ReminderCard";
+import { createReminderLogRequest, snoozeReminderRequest } from "../src/services/reminders";
 import { DashboardMetrics } from "../src/types/api";
 
 type Reminder = {
@@ -133,18 +134,61 @@ export default function MeuDiaScreen() {
     }).start();
   }, [completionRate]);
 
+  function applyLocalAction(reminderId: string, action: "DONE" | "SNOOZED" | "SKIPPED", startAt?: string) {
+    const createdAt = new Date().toISOString();
+
+    setReminders((current) =>
+      current.map((reminder) =>
+        reminder.id === reminderId
+          ? {
+              ...reminder,
+              startAt: startAt || reminder.startAt,
+              logs: [
+                { action, createdAt },
+                ...(reminder.logs || [])
+              ]
+            }
+          : reminder
+      )
+    );
+  }
+
   async function registerAction(reminderId: string, action: "DONE" | "SNOOZED" | "SKIPPED") {
     try {
-      await api.post(`/reminders/${reminderId}/log`, {
-        action,
-        note: action === "DONE" ? "Feito via Meu Dia." : action === "SNOOZED" ? "Adiado via Meu Dia." : "Pulado via Meu Dia."
-      });
-      await loadData(true);
+      const reminder = reminders.find((item) => item.id === reminderId);
 
-      if (action === "SNOOZED") {
-        const reminder = reminders.find((r) => r.id === reminderId);
-        if (reminder) showReplanDialog(reminder);
+      if (action === "SNOOZED" && reminder) {
+        const result = await snoozeReminderRequest(reminder, 10);
+        applyLocalAction(reminderId, action, result.snoozedStartAt);
+
+        Alert.alert(
+          result.queued ? "Adiado offline" : "Soneca ativada",
+          result.queued
+            ? "A tarefa foi adiada localmente e sera sincronizada quando a internet voltar."
+            : result.alarmScheduled
+            ? "Vou te lembrar novamente em 10 minutos."
+            : "A tarefa foi adiada, mas nao consegui agendar a notificacao local."
+        );
+
+        if (!result.queued) {
+          await loadData(true);
+        }
+        return;
       }
+
+      const result = await createReminderLogRequest(reminderId, {
+        action,
+        note: action === "DONE" ? "Feito via Meu Dia." : "Pulado via Meu Dia."
+      });
+
+      applyLocalAction(reminderId, action);
+
+      if (result.queued) {
+        Alert.alert("Salvo offline", "A acao sera sincronizada quando a internet voltar.");
+        return;
+      }
+
+      await loadData(true);
     } catch (e: any) {
       Alert.alert("Erro", e?.response?.data?.message || "Não foi possível atualizar.");
     }

@@ -1,6 +1,17 @@
 import { scheduleReminderAlarm } from "./alarmNotifications";
-import { api } from "./api";
+import { api, isApiNetworkError } from "./api";
+import { enqueueOfflineMutation } from "./offlineSync";
 import { Schedule, ScheduleCategory, ScheduleSourceType } from "@/types/api";
+
+type CreateSchedulePayload = {
+  title: string;
+  description?: string;
+  notes?: string;
+  links?: string[];
+  extraInfo?: string;
+  category: ScheduleCategory;
+  sourceType?: ScheduleSourceType;
+};
 
 export async function listSchedulesRequest() {
   const { data } = await api.get<{ schedules: Schedule[] }>("/schedules");
@@ -14,15 +25,28 @@ export async function getScheduleRequest(id: string) {
   return data.schedule;
 }
 
-export async function createScheduleRequest(payload: {
-  title: string;
-  description?: string;
-  category: ScheduleCategory;
-  sourceType?: ScheduleSourceType;
-}) {
+export async function createScheduleRequest(payload: CreateSchedulePayload) {
   const { data } = await api.post<{ schedule: Schedule }>("/schedules", payload);
 
   return data.schedule;
+}
+
+export async function createScheduleOfflineSafeRequest(payload: CreateSchedulePayload) {
+  try {
+    const schedule = await createScheduleRequest(payload);
+    return { schedule, queued: false };
+  } catch (error) {
+    if (!isApiNetworkError(error)) {
+      throw error;
+    }
+
+    await enqueueOfflineMutation({
+      kind: "CREATE_SCHEDULE",
+      payload
+    });
+
+    return { schedule: null, queued: true };
+  }
 }
 
 export async function deleteScheduleRequest(id: string) {
