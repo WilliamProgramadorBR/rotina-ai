@@ -1,0 +1,7 @@
+# Exclui tudo que não é necessário para o build mobile
+../backend
+../.claude
+../node_modules
+.git
+dist
+dist-build-check
