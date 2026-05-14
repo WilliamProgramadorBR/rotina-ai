@@ -8,6 +8,7 @@ import {
   View
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import * as Notifications from "expo-notifications";
 import { api } from "../src/services/api";
 import { useThemeMode } from "../src/context/ThemeContext";
 import { scheduleSnoozeAlarm } from "../src/services/alarmNotifications";
@@ -72,6 +73,7 @@ export default function AlarmActiveScreen() {
     try {
       setIsSubmitting(true);
       await stopAlarmRingtone();
+      await Notifications.dismissAllNotificationsAsync();
 
       if (isTestAlarm) {
         if (action === "SNOOZED") {
