@@ -47,7 +47,7 @@ export default function RegisterScreen() {
       if (typeof signUp === "function") {
         await signUp(name.trim(), email.trim().toLowerCase(), password);
       }
-      router.replace("/home");
+      router.replace("/onboarding");
     } catch (error: any) {
       console.log("[REGISTER ERROR]", error?.response?.data || error);
       Alert.alert("Erro ao cadastrar", error?.response?.data?.message || "Nao foi possivel criar a conta.");

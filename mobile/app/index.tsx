@@ -1,14 +1,27 @@
+import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Redirect } from "expo-router";
 import { useAuth } from "../src/context/AuthContext";
 import { useThemeMode } from "../src/context/ThemeContext";
 import { colors, fonts, spacing } from "../src/theme";
+import { checkOnboardingCompleted } from "./onboarding";
 
 export default function Index() {
   const { isLoading, isAuthenticated } = useAuth();
   const { theme, isDark } = useThemeMode();
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [onboardingDone, setOnboardingDone] = useState(true);
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    checkOnboardingCompleted().then((done) => {
+      setOnboardingDone(done);
+      setOnboardingChecked(true);
+    });
+  }, [isAuthenticated]);
+
+  if (isLoading || (isAuthenticated && !onboardingChecked)) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* Background Effects */}
@@ -38,7 +51,7 @@ export default function Index() {
   }
 
   if (isAuthenticated) {
-    return <Redirect href="/home" />;
+    return <Redirect href={onboardingDone ? "/home" : "/onboarding"} />;
   }
 
   return <Redirect href="/login" />;
