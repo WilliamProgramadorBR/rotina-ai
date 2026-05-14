@@ -539,7 +539,7 @@ export default function SettingsScreen() {
                   Conta Expo: williamdevbackend
                 </Text>
                 <Text style={[styles.creditsText, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>
-                  Versao 1.2.0
+                  Versao 3.0.0
                 </Text>
               </Card>
             </View>

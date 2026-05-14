@@ -3,7 +3,7 @@
     "name": "Rotina AI",
     "slug": "rotina-ai",
     "description": "Gerenciador de rotinas inteligente desenvolvido por William Oliveira Dos Santos.",
-    "version": "1.2.0",
+    "version": "3.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "rotinaai",
