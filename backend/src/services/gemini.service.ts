@@ -37,42 +37,6 @@ function parseJsonFromModel(text: string) {
   }
 }
 
-function fallbackSuggestion(
-  prompt: string,
-  startDate?: string,
-  timezone = "America/Sao_Paulo"
-): ScheduleSuggestion {
-  const date = startDate || getTodayInSaoPaulo();
-
-  return {
-    title: "Cronograma sugerido",
-    description: `Sugestão criada sem IA a partir do prompt: ${prompt.slice(0, 140)}`,
-    notes: null,
-    links: [],
-    extraInfo: null,
-    category: "OTHER",
-    sourceType: "AI_PROMPT",
-    confidence: 0.25,
-    warnings: [
-      "GEMINI_API_KEY não configurada. Esta é uma sugestão simples apenas para testar o fluxo.",
-      "Revise todos os horários antes de salvar."
-    ],
-    reminders: [
-      {
-        title: "Revisar cronograma",
-        description: "Ajuste este lembrete conforme sua rotina antes de confirmar.",
-        notes: null,
-        links: [],
-        location: null,
-        priority: "NORMAL",
-        date,
-        time: "09:00",
-        timezone
-      }
-    ]
-  };
-}
-
 export async function generateScheduleSuggestionWithGemini(params: {
   prompt: string;
   startDate?: string;
@@ -84,7 +48,7 @@ export async function generateScheduleSuggestionWithGemini(params: {
   const today = params.startDate || getTodayInSaoPaulo();
 
   if (!apiKey) {
-    return fallbackSuggestion(params.prompt, today, timezone);
+    throw new Error("GEMINI_API_KEY não configurada.");
   }
 
   const systemInstruction = `

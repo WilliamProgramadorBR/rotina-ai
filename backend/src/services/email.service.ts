@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import type SMTPTransport from "nodemailer/lib/smtp-transport";
 
 function getTransporter() {
   const user = process.env.GMAIL_USER;
@@ -8,14 +9,16 @@ function getTransporter() {
     throw new Error("GMAIL_USER e GMAIL_APP_PASSWORD não configurados no .env.");
   }
 
-  return nodemailer.createTransport({
+  const options = {
     host: "smtp.gmail.com",
     port: 587,
     secure: false,
     family: 4,
     tls: { rejectUnauthorized: false },
     auth: { user, pass }
-  });
+  } as SMTPTransport.Options;
+
+  return nodemailer.createTransport(options);
 }
 
 export async function sendPasswordResetEmail(to: string, name: string, code: string) {
