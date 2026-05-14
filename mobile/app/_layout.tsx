@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { router } from "expo-router";
 import { ActivityIndicator, AppState, View } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -20,6 +21,8 @@ import { AppUpdateInstaller } from "../src/components/AppUpdateInstaller";
 import { configureAlarmNotifications } from "../src/services/alarmNotifications";
 import { openAlarmFromNotificationResponse } from "../src/services/alarmNavigation";
 import { flushOfflineQueue } from "../src/services/offlineSync";
+import { scheduleWeeklyReport } from "../src/services/weeklyReport";
+import { getDashboardMetricsRequest } from "../src/services/metrics";
 import { colors } from "../src/theme";
 
 function AlarmNotificationObserver() {
@@ -35,6 +38,25 @@ function AlarmNotificationObserver() {
 
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       openAlarmFromNotificationResponse(response);
+    });
+
+    return () => subscription.remove();
+  }, []);
+
+  return null;
+}
+
+function WeeklyReportObserver() {
+  useEffect(() => {
+    getDashboardMetricsRequest()
+      .then((metrics) => scheduleWeeklyReport(metrics))
+      .catch(() => scheduleWeeklyReport(null));
+
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data || {};
+      if (data.type === "WEEKLY_REPORT") {
+        router.push("/weekly-review");
+      }
     });
 
     return () => subscription.remove();
@@ -112,6 +134,7 @@ function RootLayoutContent() {
   return (
     <AuthProvider>
       <AlarmNotificationObserver />
+      <WeeklyReportObserver />
       <OfflineSyncObserver />
       <AppUpdateInstaller />
       <StatusBar style={isDark ? "light" : "dark"} />

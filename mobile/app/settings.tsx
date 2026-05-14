@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import { Button, Card, Input, SectionTitle } from "../src/components/ui";
 import { PageHeader } from "../src/components/PageHeader";
@@ -17,6 +17,14 @@ import {
 } from "../src/services/customRingtone";
 import type { CustomRingtone } from "../src/services/customRingtone";
 import { getDashboardMetricsRequest } from "../src/services/metrics";
+import {
+  getWeeklyReportEnabled,
+  setWeeklyReportEnabled,
+  getWeeklyReportHour,
+  setWeeklyReportHour,
+  scheduleWeeklyReport,
+  cancelWeeklyReport
+} from "../src/services/weeklyReport";
 import { DashboardMetrics } from "../src/types/api";
 import { useThemeMode } from "../src/context/ThemeContext";
 import { IconSymbol } from "../src/components/IconSymbol";
@@ -32,10 +40,15 @@ export default function SettingsScreen() {
   const [isPickingRingtone, setIsPickingRingtone] = useState(false);
   const [isPreviewingRingtone, setIsPreviewingRingtone] = useState(false);
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [weeklyEnabled, setWeeklyEnabled] = useState(true);
+  const [weeklyHour, setWeeklyHour] = useState(9);
+  const [isTestingWeekly, setIsTestingWeekly] = useState(false);
 
   useEffect(() => {
     getApiBaseUrl().then(setApiUrl);
     getCustomRingtone().then(setCustomRingtone);
+    getWeeklyReportEnabled().then(setWeeklyEnabled);
+    getWeeklyReportHour().then(setWeeklyHour);
     getDashboardMetricsRequest()
       .then((metrics) => setDashboardSummary(metrics.summary))
       .catch((error) => console.log("[SETTINGS METRICS ERROR]", error?.response?.data || error));
@@ -145,6 +158,40 @@ export default function SettingsScreen() {
       }, 8000);
     } catch (error: any) {
       Alert.alert("Erro", error?.message || "Nao foi possivel tocar o audio.");
+    }
+  }
+
+  async function handleToggleWeeklyReport(value: boolean) {
+    setWeeklyEnabled(value);
+    await setWeeklyReportEnabled(value);
+    if (!value) {
+      await cancelWeeklyReport();
+    } else {
+      const metrics = await getDashboardMetricsRequest().catch(() => null);
+      await scheduleWeeklyReport(metrics);
+    }
+  }
+
+  async function handleWeeklyHourChange(delta: number) {
+    const next = Math.max(0, Math.min(23, weeklyHour + delta));
+    setWeeklyHour(next);
+    await setWeeklyReportHour(next);
+    if (weeklyEnabled) {
+      const metrics = await getDashboardMetricsRequest().catch(() => null);
+      await scheduleWeeklyReport(metrics);
+    }
+  }
+
+  async function handleTestWeeklyReport() {
+    try {
+      setIsTestingWeekly(true);
+      const metrics = await getDashboardMetricsRequest().catch(() => null);
+      await scheduleWeeklyReport(metrics);
+      Alert.alert("Relatorio semanal", "Notificacao agendada para todo domingo.");
+    } catch (error: any) {
+      Alert.alert("Erro", error?.message || "Nao foi possivel agendar o relatorio.");
+    } finally {
+      setIsTestingWeekly(false);
     }
   }
 
@@ -377,6 +424,61 @@ export default function SettingsScreen() {
                   title="Voltar para inicio"
                   variant="secondary"
                   onPress={() => router.push("/home")}
+                  style={{ marginTop: spacing.md }}
+                  size={isMobile ? "md" : "lg"}
+                  fullWidth
+                />
+              </Card>
+
+              {/* Weekly Report Card */}
+              <Card style={[styles.weeklyCard, isMobile && styles.weeklyCardMobile]}>
+                <SectionTitle
+                  title="Relatorio semanal"
+                  subtitle="Receba todo domingo um resumo da sua semana via notificacao."
+                />
+                <View style={[styles.weeklyRow, { borderColor: theme.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.weeklyRowLabel, { color: theme.text, fontSize: scaledFont(14, width) }]}>Ativar relatorio semanal</Text>
+                    <Text style={[styles.weeklyRowSub, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>Domingo de manha com resumo da semana</Text>
+                  </View>
+                  <Switch
+                    value={weeklyEnabled}
+                    onValueChange={handleToggleWeeklyReport}
+                    trackColor={{ false: theme.border, true: theme.primary }}
+                    thumbColor={weeklyEnabled ? "#fff" : theme.textMuted}
+                  />
+                </View>
+                <View style={[styles.weeklyRow, { borderColor: theme.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.weeklyRowLabel, { color: theme.text, fontSize: scaledFont(14, width) }]}>Horario do envio</Text>
+                    <Text style={[styles.weeklyRowSub, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>Todo domingo as {String(weeklyHour).padStart(2, "0")}:00h</Text>
+                  </View>
+                  <View style={styles.weeklyHourControls}>
+                    <Pressable
+                      style={[styles.weeklyHourBtn, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}
+                      onPress={() => handleWeeklyHourChange(-1)}
+                      disabled={!weeklyEnabled}
+                    >
+                      <Text style={[{ color: weeklyEnabled ? theme.text : theme.textMuted, fontSize: scaledFont(16, width) }]}>-</Text>
+                    </Pressable>
+                    <Text style={[styles.weeklyHourValue, { color: theme.text, fontSize: scaledFont(16, width) }]}>
+                      {String(weeklyHour).padStart(2, "0")}h
+                    </Text>
+                    <Pressable
+                      style={[styles.weeklyHourBtn, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}
+                      onPress={() => handleWeeklyHourChange(1)}
+                      disabled={!weeklyEnabled}
+                    >
+                      <Text style={[{ color: weeklyEnabled ? theme.text : theme.textMuted, fontSize: scaledFont(16, width) }]}>+</Text>
+                    </Pressable>
+                  </View>
+                </View>
+                <Button
+                  title="Reagendar agora"
+                  variant="secondary"
+                  onPress={handleTestWeeklyReport}
+                  loading={isTestingWeekly}
+                  disabled={!weeklyEnabled}
                   style={{ marginTop: spacing.md }}
                   size={isMobile ? "md" : "lg"}
                   fullWidth
@@ -789,6 +891,45 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     lineHeight: 20,
     marginTop: spacing.sm
+  },
+
+  weeklyCard: {
+    padding: spacing.lg
+  },
+  weeklyCardMobile: {
+    padding: spacing.md
+  },
+  weeklyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    borderBottomWidth: 1,
+    paddingVertical: spacing.md
+  },
+  weeklyRowLabel: {
+    fontFamily: fonts.bold
+  },
+  weeklyRowSub: {
+    fontFamily: fonts.regular,
+    marginTop: 2
+  },
+  weeklyHourControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm
+  },
+  weeklyHourBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  weeklyHourValue: {
+    fontFamily: fonts.bold,
+    minWidth: 40,
+    textAlign: "center"
   },
 
   apiCard: {
