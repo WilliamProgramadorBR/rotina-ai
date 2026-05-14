@@ -9,16 +9,19 @@
     "start": "tsx src/server.ts",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "security:encrypt-existing": "tsx src/scripts/encrypt-existing-data.ts"
   },
   "dependencies": {
     "@fastify/cors": "latest",
     "@fastify/jwt": "latest",
     "@prisma/adapter-better-sqlite3": "latest",
     "@prisma/client": "latest",
+    "@types/nodemailer": "^8.0.0",
     "bcryptjs": "latest",
     "dotenv": "latest",
     "fastify": "latest",
+    "nodemailer": "^8.0.7",
     "prisma": "latest",
     "zod": "latest"
   },

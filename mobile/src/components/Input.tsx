@@ -1,17 +1,24 @@
 import React from "react";
 import { StyleSheet, Text, TextInput, TextInputProps, View } from "react-native";
+import { useThemeMode } from "../context/ThemeContext";
 
 type InputProps = TextInputProps & {
   label: string;
 };
 
 export function Input({ label, style, ...props }: InputProps) {
+  const { theme } = useThemeMode();
+
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
       <TextInput
-        placeholderTextColor="#64748B"
-        style={[styles.input, style]}
+        placeholderTextColor={theme.textSoft}
+        style={[
+          styles.input,
+          { backgroundColor: theme.surface, borderColor: theme.borderStrong, color: theme.text },
+          style
+        ]}
         {...props}
       />
     </View>

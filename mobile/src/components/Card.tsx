@@ -1,14 +1,16 @@
 import React from "react";
 import { StyleSheet, View, ViewProps, useWindowDimensions } from "react-native";
+import { useThemeMode } from "../context/ThemeContext";
 
 export function Card({ children, style, ...props }: ViewProps) {
   const { width } = useWindowDimensions();
+  const { theme } = useThemeMode();
   
   // Padding responsivo baseado na largura
   const padding = width < 360 ? 14 : width < 400 ? 16 : 18;
   
   return (
-    <View style={[styles.card, { padding }, style]} {...props}>
+    <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border, padding }, style]} {...props}>
       {children}
     </View>
   );

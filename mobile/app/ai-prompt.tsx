@@ -1,20 +1,46 @@
-import { useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
-import { router } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
 import { api } from "../src/services/api";
 import { colors, fonts, radius, shadow, spacing, scaledFont } from "../src/theme";
 import { Button, Card, Input } from "../src/components/ui";
 import { PageHeader } from "../src/components/PageHeader";
 import { ScreenLayout } from "../src/components/ScreenLayout";
+import { AiBadge, AiPanel } from "../src/components/AiVisual";
+import { IconSymbol } from "../src/components/IconSymbol";
 import { useResponsive } from "../src/hooks/useResponsive";
+import { useThemeMode } from "../src/context/ThemeContext";
+
+const PROMPT_PLACEHOLDER =
+  "Ex: crie uma rotina para estudar ingles todos os dias as 20:00 por 5 dias, com 30 minutos de estudo e revisao de vocabulario.";
+
+function getParamString(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0] || "";
+  }
+
+  return value || "";
+}
 
 export default function AiPromptScreen() {
   const { width, isPhone, isSmallPhone, gap } = useResponsive();
-  const [prompt, setPrompt] = useState("Crie uma rotina para eu estudar ingles todos os dias as 20:00 durante 5 dias. Cada lembrete deve dizer: estudar ingles por 30 minutos e revisar vocabulario.");
+  const { theme } = useThemeMode();
+  const params = useLocalSearchParams<{
+    prefillPrompt?: string | string[];
+  }>();
+  const prefillPrompt = useMemo(
+    () => getParamString(params.prefillPrompt).trim(),
+    [params.prefillPrompt]
+  );
+  const [prompt, setPrompt] = useState(prefillPrompt);
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isMobile = isPhone || isSmallPhone;
+
+  useEffect(() => {
+    setPrompt(prefillPrompt);
+  }, [prefillPrompt]);
 
   async function handleGenerate() {
     try {
@@ -50,31 +76,40 @@ export default function AiPromptScreen() {
             right={
               <Pressable 
                 onPress={() => router.back()} 
-                style={[styles.backButton, isSmallPhone && styles.backButtonSmall]}
+                style={[
+                  styles.backButton,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                  isSmallPhone && styles.backButtonSmall
+                ]}
               >
-                <Text style={[styles.backText, { fontSize: scaledFont(13, width) }]}>Voltar</Text>
+                <IconSymbol name="arrow-left" size={16} color={theme.text} />
+                <Text style={[styles.backText, { color: theme.text, fontSize: scaledFont(13, width) }]}>Voltar</Text>
               </Pressable>
             }
           />
 
-          {/* Hero Section */}
-          <View style={[styles.hero, isMobile && styles.heroMobile]}>
-            <View style={[styles.heroIconBox, isMobile && styles.heroIconBoxMobile]}>
-              <Text style={[styles.heroIcon, { fontSize: scaledFont(isMobile ? 22 : 28, width) }]}>AI</Text>
+          <AiPanel
+            eyebrow="PROMPT BUILDER"
+            title="Descreva sua rotina. A IA monta os alarmes."
+            description="Voce revisa tudo antes de salvar. Para saude e remedios, confirme sempre com a receita ou orientacao medica."
+            icon="auto-fix"
+            metric="AI"
+            metricLabel="scheduler"
+            tone="cyan"
+            compact={isMobile}
+            style={styles.heroPanel}
+          >
+            <View style={styles.heroBadges}>
+              <AiBadge label="texto para cronograma" tone="cyan" />
+              <AiBadge label="revisao antes de salvar" tone="green" />
             </View>
-            <Text style={[styles.heroTitle, { fontSize: scaledFont(isMobile ? 20 : 24, width) }]}>
-              Descreva sua rotina. A IA monta os alarmes.
-            </Text>
-            <Text style={[styles.heroText, { fontSize: scaledFont(13, width) }]}>
-              Voce podera revisar tudo antes de salvar. Para saude e remedios, confirme sempre com a receita/orientacao medica.
-            </Text>
-          </View>
+          </AiPanel>
 
           {/* Form Card */}
           <Card style={[styles.formCard, isMobile && styles.formCardMobile]}>
             <Input 
               label="O que voce quer organizar?" 
-              placeholder="Ex: tomar remedio de 8 em 8 horas por 3 dias..." 
+              placeholder={PROMPT_PLACEHOLDER}
               multiline 
               value={prompt} 
               onChangeText={setPrompt}
@@ -89,6 +124,7 @@ export default function AiPromptScreen() {
             />
             <Button 
               title="Gerar cronograma" 
+              icon="auto-fix"
               onPress={handleGenerate} 
               loading={isSubmitting}
               size={isMobile ? "md" : "lg"}
@@ -98,7 +134,7 @@ export default function AiPromptScreen() {
 
           {/* Examples Section */}
           <View style={styles.examples}>
-            <Text style={[styles.examplesTitle, { fontSize: scaledFont(16, width) }]}>Exemplos rapidos</Text>
+            <Text style={[styles.examplesTitle, { color: theme.text, fontSize: scaledFont(16, width) }]}>Exemplos rapidos</Text>
             
             <View style={[styles.examplesGrid, { gap }]}>
               {[
@@ -108,13 +144,17 @@ export default function AiPromptScreen() {
               ].map((example, index) => (
                 <Pressable 
                   key={example} 
-                  style={[styles.example, isMobile && styles.exampleMobile]}
+                  style={[
+                    styles.example,
+                    { backgroundColor: theme.surface, borderColor: theme.border },
+                    isMobile && styles.exampleMobile
+                  ]}
                   onPress={() => setPrompt(example)}
                 >
-                  <View style={styles.exampleIconBox}>
-                    <Text style={styles.exampleIcon}>{index + 1}</Text>
+                  <View style={[styles.exampleIconBox, { backgroundColor: theme.primarySoft }]}>
+                    <IconSymbol name="lightbulb-on-outline" size={16} color={theme.primary} />
                   </View>
-                  <Text style={[styles.exampleText, { fontSize: scaledFont(13, width) }]}>{example}</Text>
+                  <Text style={[styles.exampleText, { color: theme.textMuted, fontSize: scaledFont(13, width) }]}>{example}</Text>
                 </Pressable>
               ))}
             </View>
@@ -134,7 +174,9 @@ const styles = StyleSheet.create({
     borderWidth: 1, 
     borderColor: colors.border, 
     alignItems: "center", 
-    justifyContent: "center" 
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: spacing.xs
   },
   backButtonSmall: {
     height: 36,
@@ -144,6 +186,14 @@ const styles = StyleSheet.create({
   backText: { 
     color: colors.text, 
     fontFamily: fonts.bold 
+  },
+  heroPanel: {
+    marginBottom: spacing.lg
+  },
+  heroBadges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm
   },
   
   hero: { 

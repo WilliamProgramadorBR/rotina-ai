@@ -6,8 +6,11 @@ import { getDashboardMetricsRequest } from "@/services/metrics";
 import { Card, EmptyState, LoadingState, StatCard } from "@/components/ui";
 import { PageHeader } from "@/components/PageHeader";
 import { ScreenLayout } from "@/components/ScreenLayout";
+import { AiBadge, AiPanel } from "@/components/AiVisual";
+import { IconSymbol } from "@/components/IconSymbol";
 import { colors, fonts, getCategoryMeta, radius, shadow, spacing, scaledFont } from "@/theme";
 import { useResponsive } from "@/hooks/useResponsive";
+import { useThemeMode } from "@/context/ThemeContext";
 
 function clampPercent(value: number) {
   return Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
@@ -24,18 +27,21 @@ function PercentBar({ value, color = colors.primary }: { value: number; color?: 
 }
 
 function InsightCard({ text, index }: { text: string; index: number }) {
+  const { theme } = useThemeMode();
+
   return (
-    <View style={styles.insightCard}>
+    <View style={[styles.insightCard, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
       <View style={styles.insightNumber}>
         <Text style={styles.insightNumberText}>{index + 1}</Text>
       </View>
-      <Text style={styles.insightText}>{text}</Text>
+      <Text style={[styles.insightText, { color: theme.text }]}>{text}</Text>
     </View>
   );
 }
 
 export default function DashboardScreen() {
   const { width, isPhone, isSmallPhone, gap } = useResponsive();
+  const { theme } = useThemeMode();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -73,10 +79,15 @@ export default function DashboardScreen() {
             onMenu={isWide ? undefined : openMenu}
             right={
               <Pressable
-                style={[styles.backButton, isSmallPhone && styles.backButtonSmall]}
+                style={[
+                  styles.backButton,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                  isSmallPhone && styles.backButtonSmall
+                ]}
                 onPress={() => router.push("/home")}
               >
-                <Text style={[styles.backText, { fontSize: scaledFont(13, width) }]}>Inicio</Text>
+                <IconSymbol name="home-outline" size={16} color={theme.text} />
+                <Text style={[styles.backText, { color: theme.text, fontSize: scaledFont(13, width) }]}>Inicio</Text>
               </Pressable>
             }
           />
@@ -85,7 +96,7 @@ export default function DashboardScreen() {
             <LoadingState label="Calculando seus indicadores..." />
           ) : !metrics ? (
             <EmptyState
-              icon="D"
+              iconName="chart-box-outline"
               title="Sem metricas"
               description="Nao foi possivel montar o dashboard agora."
             />
@@ -103,40 +114,42 @@ export default function DashboardScreen() {
               }
               contentContainerStyle={styles.scroll}
             >
-              <View style={[styles.hero, isMobile && styles.heroMobile]}>
-                <View style={[styles.heroIcon, isMobile && styles.heroIconMobile]}>
-                  <Text style={[styles.heroIconText, { fontSize: scaledFont(isMobile ? 18 : 22, width) }]}>D</Text>
+              <AiPanel
+                eyebrow="INTELIGENCIA DA ROTINA"
+                title={`${overdueReminders} ${overdueReminders === 1 ? "atividade atrasada" : "atividades atrasadas"} sem conclusao.`}
+                description="Acompanhe desempenho, categorias fortes, pendencias e uso da IA com dados reais do backend."
+                icon="chart-timeline-variant"
+                metric={`${metrics.summary.completionRate}%`}
+                metricLabel="conclusao"
+                tone={overdueReminders > 0 ? "amber" : "green"}
+                compact={isMobile}
+                style={styles.heroPanel}
+              >
+                <View style={styles.heroBadges}>
+                  <AiBadge label={`${metrics.summary.aiAdoptionRate}% criado com IA`} tone="cyan" />
+                  <AiBadge label={`${metrics.summary.streakDays} dias 100%`} tone="violet" />
                 </View>
-                <View style={styles.heroCopy}>
-                  <Text style={[styles.heroKicker, { fontSize: scaledFont(10, width) }]}>INTELIGENCIA DA ROTINA</Text>
-                  <Text style={[styles.heroTitle, { fontSize: scaledFont(isMobile ? 20 : 26, width) }]}>
-                    {overdueReminders} {overdueReminders === 1 ? "atividade atrasada" : "atividades atrasadas"} sem conclusao.
-                  </Text>
-                  <Text style={[styles.heroText, { fontSize: scaledFont(13, width) }]}>
-                    Acompanhe desempenho, categorias fortes, pendencias e uso da IA com dados do backend.
-                  </Text>
-                </View>
-              </View>
+              </AiPanel>
 
               <View style={[styles.stats, { gap }]}>
                 <View style={[styles.statItem, isSmallPhone && styles.statItemSmall]}>
-                  <StatCard title="Conclusao" value={`${metrics.summary.completionRate}%`} icon="%" tone="green" caption="vencidos" />
+                  <StatCard title="Conclusao" value={`${metrics.summary.completionRate}%`} iconName="check-circle-outline" tone="green" caption="vencidos" />
                 </View>
                 <View style={[styles.statItem, isSmallPhone && styles.statItemSmall]}>
-                  <StatCard title="Atrasados" value={overdueReminders} icon="!" tone="danger" caption="sem conclusao" />
+                  <StatCard title="Atrasados" value={overdueReminders} iconName="alert-circle-outline" tone="danger" caption="sem conclusao" />
                 </View>
                 <View style={[styles.statItem, isSmallPhone && styles.statItemSmall]}>
-                  <StatCard title="Progresso" value={`${metrics.summary.routineProgressRate}%`} icon="R" caption="geral" />
+                  <StatCard title="Progresso" value={`${metrics.summary.routineProgressRate}%`} iconName="progress-check" caption="geral" />
                 </View>
                 <View style={[styles.statItem, isSmallPhone && styles.statItemSmall]}>
-                  <StatCard title="Sequencia" value={metrics.summary.streakDays} icon="S" tone="violet" caption="dias 100%" />
+                  <StatCard title="Sequencia" value={metrics.summary.streakDays} iconName="chart-timeline-variant" tone="violet" caption="dias 100%" />
                 </View>
               </View>
 
               <View style={[styles.grid, isMobile && styles.gridMobile, { gap }]}>
                 <Card style={[styles.panel, styles.weekPanel]}>
-                  <Text style={[styles.panelTitle, { fontSize: scaledFont(17, width) }]}>Semana</Text>
-                  <Text style={[styles.panelSubtitle, { fontSize: scaledFont(12, width) }]}>
+                  <Text style={[styles.panelTitle, { color: theme.text, fontSize: scaledFont(17, width) }]}>Semana</Text>
+                  <Text style={[styles.panelSubtitle, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>
                     Volume de lembretes e taxa diaria de conclusao.
                   </Text>
                   <View style={styles.weekChart}>
@@ -163,7 +176,7 @@ export default function DashboardScreen() {
                 </Card>
 
                 <Card style={styles.panel}>
-                  <Text style={[styles.panelTitle, { fontSize: scaledFont(17, width) }]}>Resumo operacional</Text>
+                  <Text style={[styles.panelTitle, { color: theme.text, fontSize: scaledFont(17, width) }]}>Resumo operacional</Text>
                   <View style={styles.kpiList}>
                     <KpiRow label="Cronogramas ativos" value={metrics.summary.activeSchedules} />
                     <KpiRow label="Lembretes criados" value={metrics.summary.totalReminders} />
@@ -178,10 +191,10 @@ export default function DashboardScreen() {
 
               <View style={[styles.grid, isMobile && styles.gridMobile, { gap }]}>
                 <Card style={styles.panel}>
-                  <Text style={[styles.panelTitle, { fontSize: scaledFont(17, width) }]}>Categorias</Text>
+                  <Text style={[styles.panelTitle, { color: theme.text, fontSize: scaledFont(17, width) }]}>Categorias</Text>
                   <View style={styles.rankingList}>
                     {metrics.categories.length === 0 ? (
-                      <Text style={styles.emptyText}>Crie cronogramas para ver categorias.</Text>
+                      <Text style={[styles.emptyText, { color: theme.textMuted }]}>Crie cronogramas para ver categorias.</Text>
                     ) : (
                       metrics.categories.map((item) => {
                         const meta = getCategoryMeta(item.category);
@@ -189,11 +202,11 @@ export default function DashboardScreen() {
                           <View key={item.category} style={styles.rankingItem}>
                             <View style={styles.rankingHeader}>
                               <View style={[styles.rankingIcon, { backgroundColor: meta.background }]}>
-                                <Text style={[styles.rankingIconText, { color: meta.color }]}>{meta.icon}</Text>
+                                <IconSymbol name={meta.iconName} size={18} color={meta.color} />
                               </View>
                               <View style={styles.rankingTextBox}>
-                                <Text style={styles.rankingTitle}>{item.label}</Text>
-                                <Text style={styles.rankingMeta}>
+                                <Text style={[styles.rankingTitle, { color: theme.text }]}>{item.label}</Text>
+                                <Text style={[styles.rankingMeta, { color: theme.textMuted }]}>
                                   {item.done}/{item.reminders} lembretes feitos
                                 </Text>
                               </View>
@@ -208,10 +221,10 @@ export default function DashboardScreen() {
                 </Card>
 
                 <Card style={styles.panel}>
-                  <Text style={[styles.panelTitle, { fontSize: scaledFont(17, width) }]}>Prioridades</Text>
+                  <Text style={[styles.panelTitle, { color: theme.text, fontSize: scaledFont(17, width) }]}>Prioridades</Text>
                   <View style={styles.rankingList}>
                     {metrics.priorities.length === 0 ? (
-                      <Text style={styles.emptyText}>Prioridades aparecem quando houver lembretes.</Text>
+                      <Text style={[styles.emptyText, { color: theme.textMuted }]}>Prioridades aparecem quando houver lembretes.</Text>
                     ) : (
                       metrics.priorities.map((item) => (
                         <View key={item.priority} style={styles.priorityRow}>
@@ -229,7 +242,7 @@ export default function DashboardScreen() {
               </View>
 
               <Card style={styles.panel}>
-                <Text style={[styles.panelTitle, { fontSize: scaledFont(17, width) }]}>Insights</Text>
+                <Text style={[styles.panelTitle, { color: theme.text, fontSize: scaledFont(17, width) }]}>Insights</Text>
                 <View style={styles.insightsGrid}>
                   {metrics.insights.map((insight, index) => (
                     <InsightCard key={`${insight}-${index}`} text={insight} index={index} />
@@ -245,10 +258,12 @@ export default function DashboardScreen() {
 }
 
 function KpiRow({ label, value }: { label: string; value: string | number }) {
+  const { theme } = useThemeMode();
+
   return (
-    <View style={styles.kpiRow}>
-      <Text style={styles.kpiLabel}>{label}</Text>
-      <Text style={styles.kpiValue}>{value}</Text>
+    <View style={[styles.kpiRow, { borderBottomColor: theme.border }]}>
+      <Text style={[styles.kpiLabel, { color: theme.textMuted }]}>{label}</Text>
+      <Text style={[styles.kpiValue, { color: theme.text }]}>{value}</Text>
     </View>
   );
 }
@@ -262,7 +277,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingHorizontal: spacing.md,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: spacing.xs
   },
   backButtonSmall: {
     height: 38,
@@ -274,6 +291,14 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingBottom: spacing.xxxl
+  },
+  heroPanel: {
+    marginBottom: spacing.lg
+  },
+  heroBadges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm
   },
   hero: {
     minHeight: 150,

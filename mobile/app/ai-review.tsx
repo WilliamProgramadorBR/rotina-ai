@@ -9,8 +9,11 @@ import { PageHeader } from "../src/components/PageHeader";
 import { ScreenLayout } from "../src/components/ScreenLayout";
 import { scheduleLocalNotificationsForReminders } from "../src/services/aiNotifications";
 import { scheduleReminderAlarm } from "@/services/alarmNotifications";
+import { useThemeMode } from "../src/context/ThemeContext";
+import { IconSymbol } from "../src/components/IconSymbol";
 
 export default function AiReviewScreen() {
+  const { theme, isDark } = useThemeMode();
   const { suggestion: suggestionParam } = useLocalSearchParams<{ suggestion?: string }>();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -78,15 +81,15 @@ for (const reminder of createdSchedule.reminders || []) {
             title="Revisar IA"
             subtitle="Confira antes de salvar"
             onMenu={isWide ? undefined : openMenu}
-            right={<Pressable onPress={() => router.back()} style={styles.backButton}><Text style={styles.backText}>Editar</Text></Pressable>}
+            right={<Pressable onPress={() => router.back()} style={[styles.backButton, { backgroundColor: theme.surface, borderColor: theme.border }]}><Text style={[styles.backText, { color: theme.text }]}>Editar</Text></Pressable>}
           />
 
-          <View style={styles.hero}>
-            <View style={[styles.iconBox, { backgroundColor: meta.background }]}><Text style={styles.icon}>{meta.icon}</Text></View>
+          <View style={[styles.hero, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <View style={[styles.iconBox, { backgroundColor: meta.background }]}><IconSymbol name={meta.iconName} size={28} color={meta.color} /></View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.title}>{suggestion.title}</Text>
-              <Text style={styles.category}>{meta.label}</Text>
-              {suggestion.description ? <Text style={styles.description}>{suggestion.description}</Text> : null}
+              <Text style={[styles.title, { color: theme.text }]}>{suggestion.title}</Text>
+              <Text style={[styles.category, { color: theme.textMuted }]}>{meta.label}</Text>
+              {suggestion.description ? <Text style={[styles.description, { color: theme.textMuted }]}>{suggestion.description}</Text> : null}
             </View>
           </View>
 
@@ -104,18 +107,18 @@ for (const reminder of createdSchedule.reminders || []) {
             </Card>
           ) : null}
 
-          <Text style={styles.sectionTitle}>Alarmes sugeridos</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Alarmes sugeridos</Text>
 
           <ScrollView showsVerticalScrollIndicator={false}>
             {suggestion.reminders.map((reminder, index) => (
-              <View key={`${reminder.title}-${index}`} style={styles.reminder}>
-                <View style={styles.dateBox}>
+              <View key={`${reminder.title}-${index}`} style={[styles.reminder, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <View style={[styles.dateBox, { backgroundColor: isDark ? theme.surfaceMuted : theme.dark }]}>
                   <Text style={styles.date}>{reminder.date}</Text>
                   <Text style={styles.time}>{reminder.time}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.reminderTitle}>{reminder.title}</Text>
-                  {reminder.description ? <Text style={styles.reminderDescription}>{reminder.description}</Text> : null}
+                  <Text style={[styles.reminderTitle, { color: theme.text }]}>{reminder.title}</Text>
+                  {reminder.description ? <Text style={[styles.reminderDescription, { color: theme.textMuted }]}>{reminder.description}</Text> : null}
                 </View>
               </View>
             ))}

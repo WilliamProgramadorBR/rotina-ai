@@ -2,6 +2,13 @@ import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { getLatestReminderAction } from "../services/metrics.service";
+import {
+  decryptReminder,
+  decryptReminderLog,
+  decryptReminders,
+  encryptReminderData,
+  encryptReminderLogData
+} from "../services/privateData.service";
 
 const reminderPrioritySchema = z.enum([
   "LOW",
@@ -79,7 +86,7 @@ export async function remindersRoutes(app: FastifyInstance) {
     });
 
     return {
-      reminders
+      reminders: decryptReminders(reminders)
     };
   });
 
@@ -118,7 +125,7 @@ export async function remindersRoutes(app: FastifyInstance) {
     });
 
     return {
-      reminders: reminders.filter((reminder) => {
+      reminders: decryptReminders(reminders.filter((reminder) => {
         const isToday = reminder.startAt >= startOfDay && reminder.startAt <= endOfDay;
 
         if (isToday) {
@@ -128,7 +135,7 @@ export async function remindersRoutes(app: FastifyInstance) {
         const latestAction = getLatestReminderAction(reminder);
 
         return latestAction !== "DONE" && latestAction !== "SKIPPED" && latestAction !== "MISSED";
-      })
+      }))
     };
   });
 
@@ -166,7 +173,7 @@ export async function remindersRoutes(app: FastifyInstance) {
     }
 
     const reminder = await prisma.reminder.create({
-      data: {
+      data: encryptReminderData({
         scheduleId: data.scheduleId,
         title: data.title,
         description: data.description,
@@ -180,7 +187,7 @@ export async function remindersRoutes(app: FastifyInstance) {
         endAt: data.endAt ? new Date(data.endAt) : undefined,
         recurrenceRule: data.recurrenceRule,
         timezone: data.timezone
-      },
+      }),
       include: {
         schedule: true,
         logs: {
@@ -192,7 +199,7 @@ export async function remindersRoutes(app: FastifyInstance) {
     });
 
     return reply.status(201).send({
-      reminder
+      reminder: decryptReminder(reminder)
     });
   });
 
@@ -226,16 +233,16 @@ export async function remindersRoutes(app: FastifyInstance) {
     }
 
     const log = await prisma.reminderLog.create({
-      data: {
+      data: encryptReminderLogData({
         userId,
         reminderId: id,
         action,
         note
-      }
+      })
     });
 
     return reply.status(201).send({
-      log
+      log: decryptReminderLog(log)
     });
   });
 
@@ -285,7 +292,7 @@ export async function remindersRoutes(app: FastifyInstance) {
     });
 
     return {
-      reminder: updatedReminder
+      reminder: decryptReminder(updatedReminder)
     };
   });
 }

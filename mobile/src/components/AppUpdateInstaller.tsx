@@ -12,6 +12,7 @@ import {
 import * as Updates from "expo-updates";
 
 import { colors, fonts, radius, shadow, spacing, scaledFont } from "../theme";
+import { useThemeMode } from "../context/ThemeContext";
 
 type UpdateStep = "downloading" | "restarting";
 
@@ -38,6 +39,7 @@ export function AppUpdateInstaller() {
   const spin = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(0)).current;
   const { width } = useWindowDimensions();
+  const { theme } = useThemeMode();
 
   useEffect(() => {
     if (!canCheckForUpdates()) return;
@@ -138,7 +140,7 @@ export function AppUpdateInstaller() {
       visible={visible}
     >
       <View style={styles.backdrop}>
-        <View style={[styles.panel, { width: panelWidth }]}>
+        <View style={[styles.panel, { width: panelWidth, backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.animationStage}>
             <Animated.View style={[styles.orbit, { transform: [{ rotate }] }]}>
               <View style={styles.orbitDot} />
@@ -156,18 +158,18 @@ export function AppUpdateInstaller() {
             </Animated.View>
           </View>
 
-          <Text style={[styles.heading, { fontSize: scaledFont(20, width) }]}>
+          <Text style={[styles.heading, { color: theme.text, fontSize: scaledFont(20, width) }]}>
             Atualizando Rotina AI
           </Text>
-          <Text style={[styles.title, { fontSize: scaledFont(15, width) }]}>
+          <Text style={[styles.title, { color: theme.primary, fontSize: scaledFont(15, width) }]}>
             {copy.title}
           </Text>
-          <Text style={[styles.detail, { fontSize: scaledFont(13, width) }]}>
+          <Text style={[styles.detail, { color: theme.textMuted, fontSize: scaledFont(13, width) }]}>
             {copy.detail}
           </Text>
 
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: copy.progress }]} />
+          <View style={[styles.progressTrack, { backgroundColor: theme.surfaceMuted }]}>
+            <View style={[styles.progressFill, { backgroundColor: theme.primary, width: copy.progress }]} />
           </View>
         </View>
       </View>

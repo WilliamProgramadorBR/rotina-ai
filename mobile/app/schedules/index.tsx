@@ -7,7 +7,10 @@ import { Button, Chip, EmptyState, LoadingState } from "../../src/components/ui"
 import { PageHeader } from "../../src/components/PageHeader";
 import { ScreenLayout } from "../../src/components/ScreenLayout";
 import { ScheduleCard } from "../../src/components/ScheduleCard";
+import { AiBadge, AiPanel } from "../../src/components/AiVisual";
+import { IconSymbol } from "../../src/components/IconSymbol";
 import { useResponsive } from "../../src/hooks/useResponsive";
+import { useThemeMode } from "../../src/context/ThemeContext";
 
 type Schedule = {
   id: string;
@@ -34,6 +37,7 @@ const filters = [
 
 export default function SchedulesScreen() {
   const { width, isPhone, isSmallPhone, gap } = useResponsive();
+  const { theme } = useThemeMode();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -76,65 +80,58 @@ export default function SchedulesScreen() {
             subtitle="Biblioteca inteligente de rotinas"
             onMenu={isWide ? undefined : openMenu}
             right={
-              <Pressable 
-                style={[styles.newButton, isSmallPhone && styles.newButtonSmall]} 
+              <Pressable
+                style={[styles.newButton, { backgroundColor: theme.primary }, isSmallPhone && styles.newButtonSmall]}
                 onPress={() => router.push("/schedules/new")}
-              > 
+              >
+                <IconSymbol name="plus" size={16} color={colors.white} />
                 <Text style={[styles.newButtonText, { fontSize: scaledFont(13, width) }]}>
-                  {isMobile ? "+ Novo" : "+ Novo cronograma"}
+                  {isMobile ? "Novo" : "Novo cronograma"}
                 </Text>
               </Pressable>
             }
           />
 
-          {/* Hero Section */}
-          <View style={[styles.hero, isMobile && styles.heroMobile]}>
-            <View style={[styles.aiOrb, isMobile && styles.aiOrbMobile]}>
-              <Text style={[styles.aiOrbText, { fontSize: scaledFont(isMobile ? 18 : 20, width) }]}>AI</Text>
+          <AiPanel
+            title="Biblioteca inteligente de rotinas."
+            description="Encontre cronogramas, acompanhe progresso e crie novas rotinas com IA ou manualmente."
+            icon="format-list-checks"
+            metric={`${schedules.length}`}
+            metricLabel="cronogramas"
+            compact={isMobile}
+            style={styles.aiPanel}
+          >
+            <View style={styles.heroBadges}>
+              <AiBadge label={`${filtered.length} visiveis`} tone="blue" />
+              <AiBadge label={activeCategory === "ALL" ? "todos os tipos" : activeCategory.toLowerCase()} tone="violet" />
             </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <View style={styles.heroKickerBadge}>
-                <Text style={[styles.heroKicker, { fontSize: scaledFont(10, width) }]}>ASSISTENTE DE ROTINA AI</Text>
-              </View>
-              <Text style={[styles.heroTitle, { fontSize: scaledFont(isMobile ? 18 : 22, width) }]}>
-                Organize seus dias com inteligencia.
-              </Text>
-              <Text style={[styles.heroText, { fontSize: scaledFont(13, width) }]}>
-                Seus cronogramas, lembretes e metas em um so lugar.
-              </Text>
-            </View>
-            {!isMobile && (
-              <View style={styles.heroPanel}>
-                <Text style={styles.heroPanelText}>L</Text>
-              </View>
-            )}
-          </View>
+          </AiPanel>
 
           {/* Search */}
-          <View style={[styles.searchBox, isSmallPhone && styles.searchBoxSmall]}>
-            <View style={styles.searchIconBox}>
-              <Text style={styles.searchIcon}>S</Text>
+          <View style={[styles.searchBox, { backgroundColor: theme.surface, borderColor: theme.border }, isSmallPhone && styles.searchBoxSmall]}>
+            <View style={[styles.searchIconBox, { backgroundColor: theme.primarySoft }]}>
+              <IconSymbol name="magnify" size={16} color={theme.primary} />
             </View>
             <TextInput
               value={query}
               onChangeText={setQuery}
               placeholder="Buscar cronogramas..."
-              placeholderTextColor={colors.textSoft}
-              style={[styles.searchInput, { fontSize: scaledFont(14, width) }]}
+              placeholderTextColor={theme.textSoft}
+              style={[styles.searchInput, { color: theme.text, fontSize: scaledFont(14, width) }]}
             />
           </View>
 
           {/* Filter Chips */}
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
             contentContainerStyle={[styles.chips, { gap: spacing.sm }]}
           >
             {filters.map((filter) => (
-              <Chip 
-                key={filter.key} 
-                label={filter.label} 
-                active={activeCategory === filter.key} 
+              <Chip
+                key={filter.key}
+                label={filter.label}
+                active={activeCategory === filter.key}
                 onPress={() => setActiveCategory(filter.key)}
                 size={isSmallPhone ? "sm" : "md"}
               />
@@ -148,26 +145,26 @@ export default function SchedulesScreen() {
             <ScrollView
               showsVerticalScrollIndicator={false}
               refreshControl={
-                <RefreshControl 
-                  refreshing={isRefreshing} 
-                  onRefresh={() => { setIsRefreshing(true); loadSchedules(true); }} 
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={() => { setIsRefreshing(true); loadSchedules(true); }}
                 />
               }
               contentContainerStyle={styles.list}
             >
               {filtered.length === 0 ? (
                 <EmptyState
-                  icon="L"
+                  iconName="format-list-checks"
                   title="Nenhum cronograma encontrado"
                   description="Crie uma rotina manual ou transforme uma ideia em cronograma com IA."
-                  action={<Button title="Novo cronograma" onPress={() => router.push("/schedules/new")} fullWidth />}
+                  action={<Button title="Novo cronograma" icon="plus" onPress={() => router.push("/schedules/new")} fullWidth />}
                 />
               ) : (
                 filtered.map((schedule) => <ScheduleCard key={schedule.id} schedule={schedule} />)
               )}
 
               {filtered.length > 0 ? (
-                <Text style={[styles.footer, { fontSize: scaledFont(12, width) }]}>
+                <Text style={[styles.footer, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>
                   Exibindo {filtered.length} de {schedules.length} cronogramas
                 </Text>
               ) : null}
@@ -180,36 +177,46 @@ export default function SchedulesScreen() {
 }
 
 const styles = StyleSheet.create({
-  newButton: { 
-    height: 42, 
-    borderRadius: radius.md, 
-    backgroundColor: colors.primary, 
-    paddingHorizontal: spacing.md, 
-    alignItems: "center", 
-    justifyContent: "center", 
-    ...shadow.soft 
+  newButton: {
+    height: 42,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: spacing.xs,
+    ...shadow.soft
   },
   newButtonSmall: {
     height: 38,
     paddingHorizontal: spacing.sm
   },
-  newButtonText: { 
-    color: colors.white, 
-    fontFamily: fonts.bold 
+  newButtonText: {
+    color: colors.white,
+    fontFamily: fonts.bold
   },
-  
-  hero: { 
-    minHeight: 130, 
-    backgroundColor: colors.surface, 
-    borderRadius: radius.xl, 
-    padding: spacing.lg, 
-    marginBottom: spacing.lg, 
-    borderWidth: 1, 
-    borderColor: colors.border, 
-    flexDirection: "row", 
-    alignItems: "center", 
-    gap: spacing.lg, 
-    ...shadow.soft 
+  aiPanel: {
+    marginBottom: spacing.lg
+  },
+  heroBadges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm
+  },
+
+  hero: {
+    minHeight: 130,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.lg,
+    ...shadow.soft
   },
   heroMobile: {
     flexDirection: "column",
@@ -219,27 +226,27 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     minHeight: "auto"
   },
-  
-  aiOrb: { 
-    width: 64, 
-    height: 64, 
-    borderRadius: 22, 
-    backgroundColor: colors.accentSoft, 
-    borderWidth: 1, 
-    borderColor: "#E9D5FF", 
-    alignItems: "center", 
-    justifyContent: "center" 
+
+  aiOrb: {
+    width: 64,
+    height: 64,
+    borderRadius: 22,
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    alignItems: "center",
+    justifyContent: "center"
   },
   aiOrbMobile: {
     width: 52,
     height: 52,
     borderRadius: 18
   },
-  aiOrbText: { 
-    color: colors.accent, 
-    fontFamily: fonts.title 
+  aiOrbText: {
+    color: colors.accent,
+    fontFamily: fonts.title
   },
-  
+
   heroKickerBadge: {
     backgroundColor: "rgba(37, 99, 235, 0.1)",
     borderRadius: radius.pill,
@@ -248,43 +255,43 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     marginBottom: spacing.xs
   },
-  heroKicker: { 
-    color: colors.primary, 
-    fontFamily: fonts.bold, 
-    letterSpacing: 0.5 
+  heroKicker: {
+    color: colors.primary,
+    fontFamily: fonts.bold,
+    letterSpacing: 0.5
   },
-  heroTitle: { 
-    color: colors.text, 
-    fontFamily: fonts.title 
+  heroTitle: {
+    color: colors.text,
+    fontFamily: fonts.title
   },
-  heroText: { 
-    color: colors.textMuted, 
-    fontFamily: fonts.regular, 
-    lineHeight: 20, 
-    marginTop: spacing.xs 
+  heroText: {
+    color: colors.textMuted,
+    fontFamily: fonts.regular,
+    lineHeight: 20,
+    marginTop: spacing.xs
   },
-  
-  heroPanel: { 
-    width: 100, 
-    height: 80, 
-    borderRadius: radius.xl, 
-    backgroundColor: colors.primarySoft, 
-    alignItems: "center", 
-    justifyContent: "center" 
+
+  heroPanel: {
+    width: 100,
+    height: 80,
+    borderRadius: radius.xl,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center"
   },
-  heroPanelText: { 
-    color: colors.primary, 
-    fontFamily: fonts.title, 
-    fontSize: 28 
+  heroPanelText: {
+    color: colors.primary,
+    fontFamily: fonts.title,
+    fontSize: 28
   },
-  
-  searchBox: { 
-    height: 48, 
-    backgroundColor: colors.surface, 
-    borderRadius: radius.lg, 
-    borderWidth: 1, 
-    borderColor: colors.border, 
-    paddingHorizontal: spacing.sm, 
+
+  searchBox: {
+    height: 48,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.sm,
     marginBottom: spacing.md,
     flexDirection: "row",
     alignItems: "center",
@@ -293,7 +300,7 @@ const styles = StyleSheet.create({
   searchBoxSmall: {
     height: 44
   },
-  
+
   searchIconBox: {
     width: 32,
     height: 32,
@@ -312,19 +319,19 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontFamily: fonts.regular
   },
-  
-  chips: { 
-    paddingBottom: spacing.lg 
+
+  chips: {
+    paddingBottom: spacing.lg
   },
-  
-  list: { 
-    paddingBottom: spacing.xxxl 
+
+  list: {
+    paddingBottom: spacing.xxxl
   },
-  
-  footer: { 
-    color: colors.textMuted, 
-    fontFamily: fonts.medium, 
-    textAlign: "center", 
-    marginTop: spacing.lg 
+
+  footer: {
+    color: colors.textMuted,
+    fontFamily: fonts.medium,
+    textAlign: "center",
+    marginTop: spacing.lg
   }
 });

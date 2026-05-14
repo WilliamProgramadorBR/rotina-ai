@@ -10,6 +10,7 @@ import {
 import { router } from "expo-router";
 import { Calendar, DateData } from "react-native-calendars";
 import { api } from "../src/services/api";
+import { useThemeMode } from "../src/context/ThemeContext";
 import { formatOverdueLabel, isReminderOverdue } from "../src/utils/reminderStatus";
 
 type Reminder = {
@@ -55,12 +56,12 @@ function formatTime(value: string) {
 
 function getCategoryLabel(category?: string) {
   const labels: Record<string, string> = {
-    HEALTH: "Saúde",
+    HEALTH: "Saude",
     STUDY: "Estudo",
     WORKOUT: "Treino",
     WORK: "Trabalho",
     SLEEP: "Sono",
-    WATER: "Água",
+    WATER: "Agua",
     PERSONAL: "Pessoal",
     OTHER: "Outro"
   };
@@ -69,6 +70,7 @@ function getCategoryLabel(category?: string) {
 }
 
 export default function CalendarScreen() {
+  const { theme, isDark } = useThemeMode();
   const today = toDateKey(new Date());
 
   const [selectedDate, setSelectedDate] = useState(today);
@@ -126,7 +128,7 @@ export default function CalendarScreen() {
         dots: [
           {
             key: "reminders",
-            color: hasOverdue ? "#E11D48" : count >= 5 ? "#F97316" : "#2563EB"
+            color: hasOverdue ? theme.danger : count >= 5 ? theme.warning : theme.primary
           }
         ]
       };
@@ -135,12 +137,12 @@ export default function CalendarScreen() {
     marks[selectedDate] = {
       ...(marks[selectedDate] || {}),
       selected: true,
-      selectedColor: "#101828",
+      selectedColor: theme.primary,
       selectedTextColor: "#FFFFFF"
     };
 
     return marks;
-  }, [remindersByDate, selectedDate]);
+  }, [remindersByDate, selectedDate, theme]);
 
   const selectedReminders = remindersByDate[selectedDate] || [];
 
@@ -153,19 +155,24 @@ export default function CalendarScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Calendário</Text>
-          <Text style={styles.subtitle}>Veja seus alarmes e cronogramas por dia.</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Calendario</Text>
+          <Text style={[styles.subtitle, { color: theme.textMuted }]}>
+            Veja seus alarmes e cronogramas por dia.
+          </Text>
         </View>
 
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>Voltar</Text>
+        <Pressable
+          style={[styles.backButton, { backgroundColor: theme.surface, borderColor: theme.border }]}
+          onPress={() => router.back()}
+        >
+          <Text style={[styles.backButtonText, { color: theme.text }]}>Voltar</Text>
         </Pressable>
       </View>
 
-      <View style={styles.calendarCard}>
+      <View style={[styles.calendarCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <Calendar
           current={selectedDate}
           onDayPress={handleDayPress}
@@ -173,16 +180,16 @@ export default function CalendarScreen() {
           markingType="multi-dot"
           markedDates={markedDates}
           theme={{
-            backgroundColor: "#FFFFFF",
-            calendarBackground: "#FFFFFF",
-            textSectionTitleColor: "#667085",
-            selectedDayBackgroundColor: "#101828",
+            backgroundColor: theme.surface,
+            calendarBackground: theme.surface,
+            textSectionTitleColor: theme.textMuted,
+            selectedDayBackgroundColor: theme.primary,
             selectedDayTextColor: "#FFFFFF",
-            todayTextColor: "#2563EB",
-            dayTextColor: "#101828",
-            textDisabledColor: "#D0D5DD",
-            monthTextColor: "#101828",
-            arrowColor: "#101828",
+            todayTextColor: theme.primary,
+            dayTextColor: theme.text,
+            textDisabledColor: theme.textSoft,
+            monthTextColor: theme.text,
+            arrowColor: theme.text,
             textMonthFontWeight: "800",
             textDayFontWeight: "600",
             textDayHeaderFontWeight: "700"
@@ -191,7 +198,7 @@ export default function CalendarScreen() {
       </View>
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>
           {new Date(`${selectedDate}T00:00:00`).toLocaleDateString("pt-BR", {
             weekday: "long",
             day: "2-digit",
@@ -199,19 +206,19 @@ export default function CalendarScreen() {
           })}
         </Text>
 
-        <Text style={styles.countText}>
+        <Text style={[styles.countText, { color: theme.textMuted }]}>
           {selectedReminders.length} lembrete{selectedReminders.length === 1 ? "" : "s"}
         </Text>
       </View>
 
       {isLoading ? (
-        <ActivityIndicator size="large" style={{ marginTop: 28 }} />
+        <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 28 }} />
       ) : (
         <ScrollView contentContainerStyle={styles.list}>
           {selectedReminders.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>Nada agendado neste dia</Text>
-              <Text style={styles.emptyText}>
+            <View style={[styles.emptyCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>Nada agendado neste dia</Text>
+              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
                 Use a IA ou crie um lembrete manual para preencher sua rotina.
               </Text>
             </View>
@@ -220,37 +227,59 @@ export default function CalendarScreen() {
               const overdue = isReminderOverdue(reminder);
 
               return (
-              <View key={reminder.id} style={[styles.reminderCard, overdue && styles.reminderCardOverdue]}>
-                <View style={[styles.timeBadge, overdue && styles.timeBadgeOverdue]}>
-                  <Text style={[styles.timeText, overdue && styles.timeTextOverdue]}>{formatTime(reminder.startAt)}</Text>
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.reminderTitle}>{reminder.title}</Text>
-
-                  {reminder.description ? (
-                    <Text style={styles.reminderDescription}>
-                      {reminder.description}
+                <View
+                  key={reminder.id}
+                  style={[
+                    styles.reminderCard,
+                    {
+                      backgroundColor: overdue ? (isDark ? theme.dangerSoft : "#FFF7F8") : theme.surface,
+                      borderColor: overdue ? (isDark ? theme.danger : "#FECDD6") : theme.border
+                    }
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.timeBadge,
+                      {
+                        backgroundColor: overdue
+                          ? isDark ? theme.dangerSoft : "#FFF1F2"
+                          : theme.primarySoft
+                      }
+                    ]}
+                  >
+                    <Text style={[styles.timeText, { color: overdue ? theme.danger : theme.primary }]}>
+                      {formatTime(reminder.startAt)}
                     </Text>
-                  ) : null}
+                  </View>
 
-                  <View style={styles.metaRow}>
-                    <Text style={styles.metaPill}>
-                      {getCategoryLabel(reminder.schedule?.category)}
-                    </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.reminderTitle, { color: theme.text }]}>{reminder.title}</Text>
 
-                    {overdue ? (
-                      <Text style={styles.overduePill}>{formatOverdueLabel(reminder.startAt)}</Text>
-                    ) : null}
-
-                    {reminder.schedule?.title ? (
-                      <Text style={styles.scheduleText} numberOfLines={1}>
-                        {reminder.schedule.title}
+                    {reminder.description ? (
+                      <Text style={[styles.reminderDescription, { color: theme.textMuted }]}>
+                        {reminder.description}
                       </Text>
                     ) : null}
+
+                    <View style={styles.metaRow}>
+                      <Text style={[styles.metaPill, { backgroundColor: theme.surfaceMuted, color: theme.textMuted }]}>
+                        {getCategoryLabel(reminder.schedule?.category)}
+                      </Text>
+
+                      {overdue ? (
+                        <Text style={[styles.overduePill, { backgroundColor: theme.dangerSoft, color: theme.danger }]}>
+                          {formatOverdueLabel(reminder.startAt)}
+                        </Text>
+                      ) : null}
+
+                      {reminder.schedule?.title ? (
+                        <Text style={[styles.scheduleText, { color: theme.textMuted }]} numberOfLines={1}>
+                          {reminder.schedule.title}
+                        </Text>
+                      ) : null}
+                    </View>
                   </View>
                 </View>
-              </View>
               );
             })
           )}
@@ -263,7 +292,6 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F2F4F7",
     paddingTop: 54,
     paddingHorizontal: 18
   },
@@ -275,11 +303,9 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 30,
-    fontWeight: "900",
-    color: "#101828"
+    fontWeight: "900"
   },
   subtitle: {
-    color: "#667085",
     marginTop: 4,
     maxWidth: 240
   },
@@ -287,22 +313,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     height: 40,
     borderRadius: 999,
-    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#EAECF0"
+    borderWidth: 1
   },
   backButtonText: {
-    fontWeight: "800",
-    color: "#101828"
+    fontWeight: "800"
   },
   calendarCard: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 24,
     padding: 8,
-    borderWidth: 1,
-    borderColor: "#EAECF0"
+    borderWidth: 1
   },
   sectionHeader: {
     marginTop: 20,
@@ -314,73 +335,51 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "900",
-    color: "#101828",
     textTransform: "capitalize",
     flex: 1
   },
   countText: {
-    color: "#667085",
     fontWeight: "700"
   },
   list: {
     paddingBottom: 32
   },
   emptyCard: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 22,
     padding: 20,
-    borderWidth: 1,
-    borderColor: "#EAECF0"
+    borderWidth: 1
   },
   emptyTitle: {
     fontSize: 17,
-    fontWeight: "900",
-    color: "#101828"
+    fontWeight: "900"
   },
   emptyText: {
-    color: "#667085",
     marginTop: 8,
     lineHeight: 20
   },
   reminderCard: {
     flexDirection: "row",
     gap: 12,
-    backgroundColor: "#FFFFFF",
     borderRadius: 22,
     padding: 14,
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#EAECF0"
-  },
-  reminderCardOverdue: {
-    backgroundColor: "#FFF7F8",
-    borderColor: "#FECDD6"
+    borderWidth: 1
   },
   timeBadge: {
     width: 66,
     height: 48,
     borderRadius: 16,
-    backgroundColor: "#EFF6FF",
     alignItems: "center",
     justifyContent: "center"
   },
-  timeBadgeOverdue: {
-    backgroundColor: "#FFF1F2"
-  },
   timeText: {
-    color: "#2563EB",
     fontWeight: "900"
   },
-  timeTextOverdue: {
-    color: "#E11D48"
-  },
   reminderTitle: {
-    color: "#101828",
     fontSize: 16,
     fontWeight: "900"
   },
   reminderDescription: {
-    color: "#667085",
     marginTop: 5,
     lineHeight: 19
   },
@@ -391,8 +390,6 @@ const styles = StyleSheet.create({
     marginTop: 10
   },
   metaPill: {
-    backgroundColor: "#F2F4F7",
-    color: "#344054",
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
@@ -400,8 +397,6 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   overduePill: {
-    backgroundColor: "#FFF1F2",
-    color: "#E11D48",
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
@@ -409,7 +404,6 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   scheduleText: {
-    color: "#667085",
     fontWeight: "700",
     flex: 1
   }

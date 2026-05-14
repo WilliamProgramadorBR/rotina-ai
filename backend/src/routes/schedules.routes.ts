@@ -2,6 +2,11 @@ import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { withScheduleProgress } from "../services/metrics.service";
+import {
+  decryptSchedule,
+  decryptSchedules,
+  encryptScheduleData
+} from "../services/privateData.service";
 
 export async function schedulesRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
@@ -33,7 +38,7 @@ export async function schedulesRoutes(app: FastifyInstance) {
     });
 
     return {
-      schedules: schedules.map(withScheduleProgress)
+      schedules: decryptSchedules(schedules).map(withScheduleProgress)
     };
   });
 
@@ -70,7 +75,7 @@ export async function schedulesRoutes(app: FastifyInstance) {
   const data = bodySchema.parse(request.body);
 
   const schedule = await prisma.schedule.create({
-    data: {
+    data: encryptScheduleData({
       userId,
       title: data.title,
       description: data.description,
@@ -79,7 +84,7 @@ export async function schedulesRoutes(app: FastifyInstance) {
       extraInfo: data.extraInfo,
       category: data.category || "OTHER",
       sourceType: data.sourceType || "MANUAL"
-    },
+    }),
     include: {
       reminders: {
         include: {
@@ -97,7 +102,7 @@ export async function schedulesRoutes(app: FastifyInstance) {
   });
 
     return reply.status(201).send({
-    schedule: withScheduleProgress(schedule)
+    schedule: withScheduleProgress(decryptSchedule(schedule))
   });
 });
 
@@ -137,7 +142,7 @@ export async function schedulesRoutes(app: FastifyInstance) {
     }
 
     return {
-      schedule: withScheduleProgress(schedule)
+      schedule: withScheduleProgress(decryptSchedule(schedule))
     };
   });
 

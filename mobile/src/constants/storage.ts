@@ -1,7 +1,6 @@
-export const TOKEN_KEY = "troque-essa-chave-em-producao";
-
+export const TOKEN_KEY = "rotina-ai-token";
 
 export const STORAGE_KEYS = {
-  AUTH_TOKEN: "rotina-ai:auth-token",
+  AUTH_TOKEN: TOKEN_KEY,
   USER: "rotina-ai:user"
 };

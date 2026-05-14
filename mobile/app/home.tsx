@@ -10,7 +10,10 @@ import { Button, EmptyState, LoadingState, StatCard } from "../src/components/ui
 import { PageHeader } from "../src/components/PageHeader";
 import { ScreenLayout } from "../src/components/ScreenLayout";
 import { ReminderCard } from "../src/components/ReminderCard";
+import { AiBadge, AiPanel } from "../src/components/AiVisual";
+import { IconSymbol } from "../src/components/IconSymbol";
 import { useResponsive } from "../src/hooks/useResponsive";
+import { useThemeMode } from "../src/context/ThemeContext";
 import {
   countOverdueReminders,
   isReminderDone,
@@ -23,7 +26,6 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions
 } from "react-native";
 
 type Reminder = {
@@ -55,6 +57,7 @@ function isTodayReminder(reminder: Reminder) {
 export default function HomeScreen() {
   const { user } = useAuth();
   const { width, isPhone, isSmallPhone, isPhoneLarge, gap, paddingHorizontal } = useResponsive();
+  const { theme } = useThemeMode();
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardMetrics["summary"] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -127,10 +130,14 @@ export default function HomeScreen() {
             onMenu={isWide ? undefined : openMenu}
             right={
               <Pressable
-                style={[styles.notificationButton, isSmallPhone && styles.notificationButtonSmall]}
+                style={[
+                  styles.notificationButton,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                  isSmallPhone && styles.notificationButtonSmall
+                ]}
                 onPress={() => router.push("/settings")}
               >
-                <Text style={styles.notificationText}>S</Text>
+                <IconSymbol name="cog-outline" size={20} color={theme.text} />
                 <View style={styles.notificationDot}>
                   <Text style={styles.notificationDotText}>3</Text>
                 </View>
@@ -138,40 +145,34 @@ export default function HomeScreen() {
             }
           />
 
-          {/* Hero Section */}
-          <View style={[styles.hero, isMobileLayout && styles.heroMobile]}>
-            <View style={[styles.aiOrb, isMobileLayout && styles.aiOrbMobile]}>
-              <Text style={[styles.aiOrbText, { fontSize: scaledFont(isMobileLayout ? 18 : 22, width) }]}>AI</Text>
+          <AiPanel
+            title="Sua rotina em modo inteligente."
+            description="Acompanhe lembretes, conclua tarefas e deixe a IA organizar o proximo passo do dia."
+            icon="robot-outline"
+            metric={`${doneCount}/${Math.max(todayCount, 1)}`}
+            metricLabel="feitos hoje"
+            compact={isMobileLayout}
+            style={styles.heroPanel}
+          >
+            <View style={styles.heroBadges}>
+              <AiBadge label={`${overdueCount} atrasadas`} tone={overdueCount > 0 ? "amber" : "green"} />
+              <AiBadge label={`${dashboardSummary?.streakDays || 0} dias de sequencia`} tone="violet" />
             </View>
-
-            <View style={styles.heroContent}>
-              <View style={styles.heroKickerRow}>
-                <View style={styles.heroKickerBadge}>
-                  <Text style={[styles.heroKicker, { fontSize: scaledFont(10, width) }]}>ASSISTENTE DE ROTINA AI</Text>
-                </View>
-              </View>
-              <Text style={[styles.heroTitle, { fontSize: scaledFont(isMobileLayout ? 18 : 22, width) }]}>
-                Sua rotina em modo inteligente.
-              </Text>
-              <Text style={[styles.heroText, { fontSize: scaledFont(13, width) }]}>
-                Acompanhe seus lembretes, marque o que foi feito e deixe a IA te ajudar a manter o foco.
-              </Text>
-            </View>
-          </View>
+          </AiPanel>
 
           {/* Stats Grid */}
           <View style={[styles.stats, { gap }]}>
             <View style={[styles.statItem, isSmallPhone && styles.statItemSmall]}>
-              <StatCard title="Hoje" value={todayCount} icon="T" caption="Compromissos" />
+              <StatCard title="Hoje" value={todayCount} iconName="calendar-check-outline" caption="Compromissos" />
             </View>
             <View style={[styles.statItem, isSmallPhone && styles.statItemSmall]}>
-              <StatCard title="Atrasadas" value={overdueCount} icon="!" tone="danger" caption="sem conclusao" />
+              <StatCard title="Atrasadas" value={overdueCount} iconName="alert-circle-outline" tone="danger" caption="sem conclusao" />
             </View>
             <View style={[styles.statItem, isSmallPhone && styles.statItemSmall]}>
-              <StatCard title="Feitos" value={doneCount} icon="V" tone="green" caption="Concluidos" />
+              <StatCard title="Feitos" value={doneCount} iconName="check-decagram-outline" tone="green" caption="Concluidos" />
             </View>
             <View style={[styles.statItem, isSmallPhone && styles.statItemSmall]}>
-              <StatCard title="Sequencia" value={dashboardSummary?.streakDays || 0} icon="S" tone="violet" caption="dias 100%" />
+              <StatCard title="Sequencia" value={dashboardSummary?.streakDays || 0} iconName="chart-timeline-variant" tone="violet" caption="dias 100%" />
             </View>
           </View>
 
@@ -181,7 +182,7 @@ export default function HomeScreen() {
               onPress={() => setActiveFilter("OVERDUE")}
             >
               <View style={styles.overdueNoticeIcon}>
-                <Text style={styles.overdueNoticeIconText}>!</Text>
+                <IconSymbol name="alert" size={20} color={colors.white} />
               </View>
               <View style={styles.overdueNoticeCopy}>
                 <Text style={[styles.overdueNoticeTitle, { fontSize: scaledFont(14, width) }]}>
@@ -195,7 +196,7 @@ export default function HomeScreen() {
           ) : null}
 
           {/* Quick Actions */}
-          <Text style={[styles.sectionLabel, { fontSize: scaledFont(14, width) }]}>Acoes rapidas</Text>
+          <Text style={[styles.sectionLabel, { color: theme.text, fontSize: scaledFont(14, width) }]}>Acoes rapidas</Text>
 
           <View style={[styles.quickGrid, { gap }]}>
             <Pressable
@@ -203,7 +204,7 @@ export default function HomeScreen() {
               onPress={() => router.push("/ai-prompt")}
             >
               <View style={styles.quickIconPrimary}>
-                <Text style={styles.quickIconPrimaryText}>AI</Text>
+                <IconSymbol name="auto-fix" size={20} color={colors.white} />
               </View>
               <View style={styles.quickTextBox}>
                 <Text style={[styles.quickTitlePrimary, { fontSize: scaledFont(14, width) }]}>Criar com IA</Text>
@@ -214,54 +215,70 @@ export default function HomeScreen() {
             </Pressable>
 
             <Pressable
-              style={[styles.quickCard, isMobileLayout && styles.quickCardMobile]}
+              style={[
+                styles.quickCard,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+                isMobileLayout && styles.quickCardMobile
+              ]}
               onPress={() => router.push("/schedules/new")}
             >
               <View style={styles.quickIcon}>
-                <Text style={styles.quickIconText}>+</Text>
+                <IconSymbol name="plus" size={20} color={theme.primary} />
               </View>
               <View style={styles.quickTextBox}>
-                <Text style={[styles.quickTitle, { fontSize: scaledFont(14, width) }]}>Novo cronograma</Text>
-                <Text style={[styles.quickSubtitle, { fontSize: scaledFont(12, width) }]}>Criar manualmente</Text>
+                <Text style={[styles.quickTitle, { color: theme.text, fontSize: scaledFont(14, width) }]}>Novo cronograma</Text>
+                <Text style={[styles.quickSubtitle, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>Criar manualmente</Text>
               </View>
             </Pressable>
 
             <Pressable
-              style={[styles.quickCard, isMobileLayout && styles.quickCardMobile]}
+              style={[
+                styles.quickCard,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+                isMobileLayout && styles.quickCardMobile
+              ]}
               onPress={() => router.push("/schedules")}
             >
               <View style={styles.quickIcon}>
-                <Text style={styles.quickIconText}>L</Text>
+                <IconSymbol name="format-list-checks" size={20} color={theme.primary} />
               </View>
               <View style={styles.quickTextBox}>
-                <Text style={[styles.quickTitle, { fontSize: scaledFont(14, width) }]}>Ver cronogramas</Text>
-                <Text style={[styles.quickSubtitle, { fontSize: scaledFont(12, width) }]}>Gerenciar rotinas</Text>
+                <Text style={[styles.quickTitle, { color: theme.text, fontSize: scaledFont(14, width) }]}>Ver cronogramas</Text>
+                <Text style={[styles.quickSubtitle, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>Gerenciar rotinas</Text>
               </View>
             </Pressable>
 
             <Pressable
-              style={[styles.quickCard, isMobileLayout && styles.quickCardMobile]}
+              style={[
+                styles.quickCard,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+                isMobileLayout && styles.quickCardMobile
+              ]}
               onPress={() => router.push("/dashboard")}
             >
               <View style={styles.quickIcon}>
-                <Text style={styles.quickIconText}>D</Text>
+                <IconSymbol name="chart-box-outline" size={20} color={theme.primary} />
               </View>
               <View style={styles.quickTextBox}>
-                <Text style={[styles.quickTitle, { fontSize: scaledFont(14, width) }]}>Dashboard</Text>
-                <Text style={[styles.quickSubtitle, { fontSize: scaledFont(12, width) }]}>Ver metricas reais</Text>
+                <Text style={[styles.quickTitle, { color: theme.text, fontSize: scaledFont(14, width) }]}>Dashboard</Text>
+                <Text style={[styles.quickSubtitle, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>Ver metricas reais</Text>
               </View>
             </Pressable>
 
             <Pressable
-              style={[styles.quickCard, isMobileLayout && styles.quickCardMobile]}
+              style={[
+                styles.quickCard,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+                isMobileLayout && styles.quickCardMobile
+              ]}
               onPress={() => router.push("/settings")}
             >
               <View style={styles.quickIcon}>
-                <Text style={styles.quickIconText}>A</Text>
+                <IconSymbol name="bell-ring-outline" size={20} color={theme.primary} />
               </View>
               <View style={styles.quickTextBox}>
-                <Text style={[styles.quickTitle, { fontSize: scaledFont(14, width) }]}>Testar alarme</Text>
-                <Text style={[styles.quickSubtitle, { fontSize: scaledFont(12, width) }]}>Enviar teste agora</Text>
+                <Text style={[styles.quickTitle, { color: theme.text, fontSize: scaledFont(14, width) }]}>Testar alarme</Text>
+                <Text style={[styles.quickSubtitle, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>Enviar teste agora</Text>
               </View>
             </Pressable>
           </View>
@@ -269,7 +286,7 @@ export default function HomeScreen() {
           {/* Today Section */}
           <View style={[styles.todayHeader, isMobileLayout && styles.todayHeaderMobile]}>
             <View style={styles.todayTitleRow}>
-              <Text style={[styles.todayTitle, { fontSize: scaledFont(20, width) }]}>Hoje e atrasadas</Text>
+              <Text style={[styles.todayTitle, { color: theme.text, fontSize: scaledFont(20, width) }]}>Hoje e atrasadas</Text>
               <View style={styles.todayBadge}>
                 <Text style={[styles.todayBadgeText, { fontSize: scaledFont(11, width) }]}>{todayCount} hoje</Text>
               </View>
@@ -293,7 +310,9 @@ export default function HomeScreen() {
                   key={item.key}
                   style={[
                     styles.filter,
+                    { backgroundColor: theme.surface, borderColor: theme.border },
                     activeFilter === item.key && styles.filterActive,
+                    activeFilter === item.key && { backgroundColor: theme.primary, borderColor: theme.primary },
                     isSmallPhone && styles.filterSmall
                   ]}
                   onPress={() => setActiveFilter(item.key as any)}
@@ -301,6 +320,7 @@ export default function HomeScreen() {
                   <Text
                     style={[
                       styles.filterText,
+                      { color: activeFilter === item.key ? theme.white : theme.textMuted },
                       activeFilter === item.key && styles.filterTextActive,
                       { fontSize: scaledFont(12, width) }
                     ]}
@@ -319,12 +339,13 @@ export default function HomeScreen() {
             <View style={styles.timeline}>
               {grouped.length === 0 ? (
                 <EmptyState
-                  icon="*"
+                  iconName="calendar-blank-outline"
                   title="Nada por aqui"
                   description="Voce ainda nao possui lembretes para este filtro. Crie um cronograma manual ou gere uma rotina com IA."
                   action={
                     <Button
                       title="Criar com IA"
+                      icon="auto-fix"
                       onPress={() => router.push("/ai-prompt")}
                       fullWidth
                     />
@@ -406,6 +427,16 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontFamily: fonts.bold,
     fontSize: 10
+  },
+
+  heroPanel: {
+    marginBottom: spacing.lg
+  },
+
+  heroBadges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm
   },
 
   hero: {

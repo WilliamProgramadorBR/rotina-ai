@@ -2,6 +2,8 @@ import React from "react";
 import { Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { colors, fonts, radius, spacing, scaledFont } from "../theme";
 import { useResponsive } from "../hooks/useResponsive";
+import { IconSymbol } from "./IconSymbol";
+import { useThemeMode } from "../context/ThemeContext";
 
 type PageHeaderProps = {
   title: string;
@@ -19,6 +21,7 @@ export function PageHeader({
   searchPlaceholder
 }: PageHeaderProps) {
   const { width, isPhone, isSmallPhone } = useResponsive();
+  const { theme } = useThemeMode();
   const isMobile = isPhone || isSmallPhone;
 
   return (
@@ -26,15 +29,23 @@ export function PageHeader({
       <View style={[styles.topRow, isMobile && styles.topRowMobile]}>
         <View style={styles.leftSide}>
           {onMenu ? (
-            <Pressable style={[styles.menuButton, isSmallPhone && styles.menuButtonSmall]} onPress={onMenu}>
-              <Text style={[styles.menuText, { fontSize: scaledFont(16, width) }]}>=</Text>
+            <Pressable
+              style={[
+                styles.menuButton,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+                isSmallPhone && styles.menuButtonSmall
+              ]}
+              onPress={onMenu}
+            >
+              <IconSymbol name="menu" size={20} color={theme.text} />
             </Pressable>
           ) : null}
 
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text
               style={[
-                styles.title, 
+                styles.title,
+                { color: theme.text },
                 { fontSize: scaledFont(isMobile ? 24 : 30, width) }
               ]}
               numberOfLines={2}
@@ -43,8 +54,8 @@ export function PageHeader({
             </Text>
 
             {subtitle ? (
-              <Text 
-                style={[styles.subtitle, { fontSize: scaledFont(13, width) }]} 
+              <Text
+                style={[styles.subtitle, { color: theme.textMuted, fontSize: scaledFont(13, width) }]}
                 numberOfLines={2}
               >
                 {subtitle}
@@ -62,14 +73,14 @@ export function PageHeader({
 
       {searchPlaceholder ? (
         <View style={[styles.bottomRow, isMobile && styles.bottomRowMobile]}>
-          <View style={[styles.searchBox, isSmallPhone && styles.searchBoxSmall]}>
-            <View style={styles.searchIconBox}>
-              <Text style={[styles.searchIcon, { fontSize: scaledFont(12, width) }]}>S</Text>
+          <View style={[styles.searchBox, { backgroundColor: theme.surface, borderColor: theme.border }, isSmallPhone && styles.searchBoxSmall]}>
+            <View style={[styles.searchIconBox, { backgroundColor: theme.primarySoft }]}>
+              <IconSymbol name="magnify" size={16} color={theme.primary} />
             </View>
             <TextInput
               placeholder={searchPlaceholder}
-              placeholderTextColor={colors.textSoft}
-              style={[styles.searchInput, { fontSize: scaledFont(14, width) }]}
+              placeholderTextColor={theme.textSoft}
+              style={[styles.searchInput, { color: theme.text, fontSize: scaledFont(14, width) }]}
             />
           </View>
         </View>
@@ -125,11 +136,6 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: radius.md
-  },
-
-  menuText: {
-    color: colors.text,
-    fontFamily: fonts.bold
   },
 
   title: {

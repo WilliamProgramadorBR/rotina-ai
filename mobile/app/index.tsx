@@ -1,36 +1,38 @@
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Redirect } from "expo-router";
 import { useAuth } from "../src/context/AuthContext";
+import { useThemeMode } from "../src/context/ThemeContext";
 import { colors, fonts, spacing } from "../src/theme";
 
 export default function Index() {
   const { isLoading, isAuthenticated } = useAuth();
+  const { theme, isDark } = useThemeMode();
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* Background Effects */}
         <View style={styles.glowOne} />
         <View style={styles.glowTwo} />
         
         {/* Logo */}
         <View style={styles.logoContainer}>
-          <View style={styles.logo}>
-            <Text style={styles.logoText}>AI</Text>
+          <View style={[styles.logo, { backgroundColor: theme.primarySoft, borderColor: theme.focusRing }]}>
+            <Text style={[styles.logoText, { color: isDark ? "#22D3EE" : theme.primary }]}>AI</Text>
           </View>
-          <Text style={styles.brand}>
-            Rotina <Text style={styles.brandAccent}>AI</Text>
+          <Text style={[styles.brand, { color: theme.text }]}>
+            Rotina <Text style={[styles.brandAccent, { color: theme.accent }]}>AI</Text>
           </Text>
         </View>
         
         {/* Loading */}
         <View style={styles.loadingBox}>
-          <ActivityIndicator size="large" color="#60A5FA" />
-          <Text style={styles.loadingText}>Carregando...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Carregando...</Text>
         </View>
         
         {/* Footer */}
-        <Text style={styles.footer}>Sua rotina em modo inteligente</Text>
+        <Text style={[styles.footer, { color: theme.textSoft }]}>Sua rotina em modo inteligente</Text>
       </View>
     );
   }

@@ -8,6 +8,14 @@ import React, {
 } from "react";
 import { api, getAuthToken, removeAuthToken, saveAuthToken, setAuthToken } from "../services/api";
 
+const ENABLE_AUTH_DEBUG_LOGS = __DEV__ && process.env.EXPO_PUBLIC_DEBUG_AUTH === "true";
+
+function debugAuthLog(message: string, details?: unknown) {
+  if (ENABLE_AUTH_DEBUG_LOGS) {
+    console.log(message, details);
+  }
+}
+
 type User = {
   id: string;
   name: string;
@@ -52,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const reloadUser = useCallback(async () => {
     const storedToken = await getAuthToken();
 
-    console.log("[AUTH] reloadUser", {
+    debugAuthLog("[AUTH] reloadUser", {
       hasToken: Boolean(storedToken)
     });
 
@@ -71,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(response.data.user);
     } catch (error) {
-      console.log("[AUTH] Token inválido ou sessão expirada. Limpando sessão.");
+      debugAuthLog("[AUTH] Token invalido ou sessao expirada. Limpando sessao.");
 
       await removeAuthToken();
 
@@ -87,8 +95,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password
       });
 
-      console.log("[LOGIN RESPONSE]", {
-        user: response.data.user,
+      debugAuthLog("[LOGIN RESPONSE]", {
+        userId: response.data.user.id,
         hasToken: Boolean(response.data.token)
       });
 
@@ -105,8 +113,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password
       });
 
-      console.log("[REGISTER RESPONSE]", {
-        user: response.data.user,
+      debugAuthLog("[REGISTER RESPONSE]", {
+        userId: response.data.user.id,
         hasToken: Boolean(response.data.token)
       });
 

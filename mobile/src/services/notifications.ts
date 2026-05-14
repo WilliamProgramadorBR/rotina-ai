@@ -69,7 +69,7 @@ export async function configureNotificationSystem() {
       vibrationPattern: [0, 400, 250, 400],
       lightColor: "#22C55E",
       sound: "default",
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
     });
   }
 

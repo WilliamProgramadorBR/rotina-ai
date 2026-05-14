@@ -9,8 +9,11 @@ import { countOverdueReminders, formatOverdueLabel, isReminderOverdue } from "..
 import { Button, EmptyState, LoadingState, StatCard } from "../../src/components/ui";
 import { PageHeader } from "../../src/components/PageHeader";
 import { ScreenLayout } from "../../src/components/ScreenLayout";
+import { useThemeMode } from "../../src/context/ThemeContext";
+import { IconSymbol } from "../../src/components/IconSymbol";
 
 export default function ScheduleDetailScreen() {
+  const { theme, isDark } = useThemeMode();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,7 +69,7 @@ export default function ScheduleDetailScreen() {
     <ScreenLayout>
       {({ openMenu, isWide }) => (
         <>
-          <PageHeader title="Detalhes" subtitle="Cronograma e lembretes" onMenu={isWide ? undefined : openMenu} right={<Pressable onPress={() => router.back()} style={styles.backButton}><Text style={styles.backText}>Voltar</Text></Pressable>} />
+          <PageHeader title="Detalhes" subtitle="Cronograma e lembretes" onMenu={isWide ? undefined : openMenu} right={<Pressable onPress={() => router.back()} style={[styles.backButton, { backgroundColor: theme.surface, borderColor: theme.border }]}><Text style={[styles.backText, { color: theme.text }]}>Voltar</Text></Pressable>} />
 
           {isLoading ? (
             <LoadingState label="Carregando cronograma..." />
@@ -74,12 +77,12 @@ export default function ScheduleDetailScreen() {
             <EmptyState icon="📋" title="Cronograma não encontrado" description="Não foi possível localizar este cronograma." />
           ) : (
             <>
-              <View style={styles.hero}>
-                <View style={[styles.iconBox, { backgroundColor: meta.background }]}><Text style={styles.icon}>{meta.icon}</Text></View>
+              <View style={[styles.hero, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <View style={[styles.iconBox, { backgroundColor: meta.background }]}><IconSymbol name={meta.iconName} size={28} color={meta.color} /></View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.title}>{schedule.title}</Text>
-                  <Text style={styles.category}>{meta.label}</Text>
-                  {schedule.description ? <Text style={styles.description}>{schedule.description}</Text> : null}
+                  <Text style={[styles.title, { color: theme.text }]}>{schedule.title}</Text>
+                  <Text style={[styles.category, { color: theme.textMuted }]}>{meta.label}</Text>
+                  {schedule.description ? <Text style={[styles.description, { color: theme.textMuted }]}>{schedule.description}</Text> : null}
                 </View>
               </View>
 
@@ -94,7 +97,7 @@ export default function ScheduleDetailScreen() {
                 <Button title="Remover" variant="danger" onPress={deleteSchedule} style={{ flex: 1 }} />
               </View>
 
-              <Text style={styles.sectionTitle}>Lembretes do cronograma</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Lembretes do cronograma</Text>
 
               {grouped.length === 0 ? (
                 <EmptyState icon="🔔" title="Sem lembretes" description="Adicione o primeiro lembrete para ativar este cronograma." action={<Button title="Adicionar lembrete" onPress={() => router.push({ pathname: "/reminders/new", params: { scheduleId: schedule.id } })} />} />
@@ -102,18 +105,18 @@ export default function ScheduleDetailScreen() {
                 <ScrollView showsVerticalScrollIndicator={false}>
                   {grouped.map((group) => (
                     <View key={group.period} style={styles.period}>
-                      <Text style={styles.periodTitle}>{group.period}</Text>
+                      <Text style={[styles.periodTitle, { color: theme.textMuted }]}>{group.period}</Text>
                       {group.data.map((reminder: Reminder) => {
                         const overdue = isReminderOverdue(reminder);
 
                         return (
-                          <View key={reminder.id} style={[styles.reminderRow, overdue && styles.reminderRowOverdue]}>
-                            <Text style={[styles.reminderTime, overdue && styles.reminderTimeOverdue]}>
+                          <View key={reminder.id} style={[styles.reminderRow, { backgroundColor: theme.surface, borderColor: theme.border }, overdue && styles.reminderRowOverdue, overdue && { backgroundColor: isDark ? "#2A1626" : colors.dangerSoft, borderColor: "#FECDD6" }]}>
+                            <Text style={[styles.reminderTime, { backgroundColor: isDark ? theme.surfaceMuted : theme.dark }, overdue && styles.reminderTimeOverdue]}>
                               {formatTime(reminder.startAt)}
                             </Text>
                             <View style={{ flex: 1 }}>
-                              <Text style={styles.reminderTitle}>{reminder.title}</Text>
-                              {reminder.description ? <Text style={styles.reminderDescription} numberOfLines={2}>{reminder.description}</Text> : null}
+                              <Text style={[styles.reminderTitle, { color: theme.text }]}>{reminder.title}</Text>
+                              {reminder.description ? <Text style={[styles.reminderDescription, { color: theme.textMuted }]} numberOfLines={2}>{reminder.description}</Text> : null}
                               {overdue ? <Text style={styles.reminderOverdueText}>{formatOverdueLabel(reminder.startAt)}</Text> : null}
                             </View>
                           </View>

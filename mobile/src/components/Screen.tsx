@@ -1,5 +1,6 @@
 import React from "react";
 import { SafeAreaView, ScrollView, StyleSheet, View, useWindowDimensions, Platform, StatusBar } from "react-native";
+import { useThemeMode } from "../context/ThemeContext";
 
 type ScreenProps = {
   children: React.ReactNode;
@@ -8,6 +9,7 @@ type ScreenProps = {
 
 export function Screen({ children, scroll = true }: ScreenProps) {
   const { width } = useWindowDimensions();
+  const { theme, isDark } = useThemeMode();
   
   // Padding horizontal responsivo baseado na largura da tela
   const horizontalPadding = width < 360 ? 12 : width < 400 ? 16 : 20;
@@ -17,8 +19,8 @@ export function Screen({ children, scroll = true }: ScreenProps) {
 
   if (scroll) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.background} />
         <ScrollView 
           contentContainerStyle={[
             styles.scrollContent,
@@ -37,8 +39,8 @@ export function Screen({ children, scroll = true }: ScreenProps) {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.background} />
       <View style={[
         styles.content,
         { 

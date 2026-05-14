@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { api } from "../src/services/api";
+import { useThemeMode } from "../src/context/ThemeContext";
 import { scheduleSnoozeAlarm } from "../src/services/alarmNotifications";
 import { playAlarmRingtone, stopAlarmRingtone } from "../src/services/customRingtone";
 import { colors, spacing } from "../src/theme";
@@ -39,6 +40,7 @@ function formatAlarmTime(value: string) {
 }
 
 export default function AlarmActiveScreen() {
+  const { theme, isDark } = useThemeMode();
   const params = useLocalSearchParams();
 
   const reminderId = getSafeString(params.reminderId);
@@ -132,43 +134,43 @@ export default function AlarmActiveScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.glow} />
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.glow, { backgroundColor: theme.primary, opacity: isDark ? 0.22 : 0.12 }]} />
 
-      <View style={styles.card}>
-        <Text style={styles.kicker}>Alarme ativo</Text>
+      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <Text style={[styles.kicker, { color: theme.primary }]}>Alarme ativo</Text>
 
-        <Text style={styles.time}>{timeLabel}</Text>
+        <Text style={[styles.time, { color: theme.text }]}>{timeLabel}</Text>
 
-        <View style={styles.iconCircle}>
+        <View style={[styles.iconCircle, { backgroundColor: theme.primarySoft }]}>
           <Text style={styles.icon}>⏰</Text>
         </View>
 
-        <Text style={styles.title}>{title}</Text>
+        <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
 
         {description ? (
-          <Text style={styles.description}>{description}</Text>
+          <Text style={[styles.description, { color: theme.textMuted }]}>{description}</Text>
         ) : (
-          <Text style={styles.description}>
+          <Text style={[styles.description, { color: theme.textMuted }]}>
             Você tem um lembrete importante agora.
           </Text>
         )}
 
         {scheduleTitle ? (
-          <View style={styles.schedulePill}>
-            <Text style={styles.schedulePillText}>{scheduleTitle}</Text>
+          <View style={[styles.schedulePill, { backgroundColor: theme.surfaceMuted }]}>
+            <Text style={[styles.schedulePillText, { color: theme.text }]}>{scheduleTitle}</Text>
           </View>
         ) : null}
 
         {notificationAction && notificationAction !== "expo.modules.notifications.actions.DEFAULT" ? (
-          <Text style={styles.smallInfo}>
+          <Text style={[styles.smallInfo, { color: theme.textMuted }]}>
             Ação recebida: {notificationAction}
           </Text>
         ) : null}
 
         <View style={styles.actions}>
           <Pressable
-            style={[styles.button, styles.doneButton]}
+            style={[styles.button, { backgroundColor: theme.primary }]}
             disabled={isSubmitting}
             onPress={() => registerAction("DONE")}
           >
@@ -180,19 +182,19 @@ export default function AlarmActiveScreen() {
           </Pressable>
 
           <Pressable
-            style={[styles.button, styles.snoozeButton]}
+            style={[styles.button, { backgroundColor: theme.primarySoft, borderColor: theme.focusRing, borderWidth: 1 }]}
             disabled={isSubmitting}
             onPress={() => registerAction("SNOOZED")}
           >
-            <Text style={styles.secondaryButtonText}>Soneca 10 min</Text>
+            <Text style={[styles.secondaryButtonText, { color: theme.primary }]}>Soneca 10 min</Text>
           </Pressable>
 
           <Pressable
-            style={[styles.button, styles.skipButton]}
+            style={[styles.button, { backgroundColor: theme.dangerSoft, borderColor: theme.danger, borderWidth: 1 }]}
             disabled={isSubmitting}
             onPress={() => registerAction("SKIPPED")}
           >
-            <Text style={styles.skipButtonText}>Pular</Text>
+            <Text style={[styles.skipButtonText, { color: theme.danger }]}>Pular</Text>
           </Pressable>
         </View>
       </View>
@@ -221,6 +223,7 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: "#FFFFFF",
     borderRadius: 34,
+    borderWidth: 1,
     padding: spacing.xl,
     alignItems: "center"
   },

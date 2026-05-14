@@ -18,9 +18,12 @@ import {
 import type { CustomRingtone } from "../src/services/customRingtone";
 import { getDashboardMetricsRequest } from "../src/services/metrics";
 import { DashboardMetrics } from "../src/types/api";
+import { useThemeMode } from "../src/context/ThemeContext";
+import { IconSymbol } from "../src/components/IconSymbol";
 
 export default function SettingsScreen() {
   const { width, isPhone, isSmallPhone, gap } = useResponsive();
+  const { mode, setMode, theme, isDark } = useThemeMode();
   const isMobile = isPhone || isSmallPhone;
   const [apiUrl, setApiUrl] = useState(getDefaultApiBaseUrl());
   const [isSavingApiUrl, setIsSavingApiUrl] = useState(false);
@@ -170,11 +173,16 @@ export default function SettingsScreen() {
             subtitle="Valide permissoes e garanta que seus alarmes sejam entregues"
             onMenu={isWide ? undefined : openMenu}
             right={
-              <Pressable 
-                style={[styles.backButton, isSmallPhone && styles.backButtonSmall]} 
+              <Pressable
+                style={[
+                  styles.backButton,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                  isSmallPhone && styles.backButtonSmall
+                ]}
                 onPress={() => router.back()}
               >
-                <Text style={[styles.backText, { fontSize: scaledFont(13, width) }]}>Voltar</Text>
+                <IconSymbol name="arrow-left" size={16} color={theme.text} />
+                <Text style={[styles.backText, { color: theme.text, fontSize: scaledFont(13, width) }]}>Voltar</Text>
               </Pressable>
             }
           />
@@ -184,40 +192,40 @@ export default function SettingsScreen() {
             <View style={[styles.leftColumn, isMobile && styles.columnMobile, { gap }]}>
               {/* Validation Card */}
               <Card style={[styles.validationCard, isMobile && styles.validationCardMobile]}>
-                <SectionTitle 
-                  title="Validacao rapida" 
-                  subtitle="Teste instantaneamente o envio de uma notificacao em seu dispositivo." 
+                <SectionTitle
+                  title="Validacao rapida"
+                  subtitle="Teste instantaneamente o envio de uma notificacao em seu dispositivo."
                 />
                 <View style={[styles.statusGrid, isMobile && styles.statusGridMobile, { gap: spacing.sm }]}>
-                  <View style={[styles.statusBox, isMobile && styles.statusBoxMobile]}>
-                    <Text style={[styles.statusLabel, { fontSize: scaledFont(12, width) }]}>Status do servico</Text>
+                  <View style={[styles.statusBox, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }, isMobile && styles.statusBoxMobile]}>
+                    <Text style={[styles.statusLabel, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>Status do servico</Text>
                     <Text style={[styles.statusGood, { fontSize: scaledFont(isMobile ? 18 : 20, width) }]}>Operacional</Text>
-                    <Text style={[styles.statusSub, { fontSize: scaledFont(11, width) }]}>Todos os sistemas ok</Text>
+                    <Text style={[styles.statusSub, { color: theme.textMuted, fontSize: scaledFont(11, width) }]}>Todos os sistemas ok</Text>
                   </View>
-                  <View style={[styles.statusBox, isMobile && styles.statusBoxMobile]}>
-                    <Text style={[styles.statusLabel, { fontSize: scaledFont(12, width) }]}>Permissao atual</Text>
+                  <View style={[styles.statusBox, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }, isMobile && styles.statusBoxMobile]}>
+                    <Text style={[styles.statusLabel, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>Permissao atual</Text>
                     <Text style={[styles.statusWarn, { fontSize: scaledFont(isMobile ? 18 : 20, width) }]}>Verificar</Text>
-                    <Text style={[styles.statusSub, { fontSize: scaledFont(11, width) }]}>Necessaria para alarmes</Text>
+                    <Text style={[styles.statusSub, { color: theme.textMuted, fontSize: scaledFont(11, width) }]}>Necessaria para alarmes</Text>
                   </View>
                 </View>
                 <View style={[styles.actionsRow, isMobile && styles.actionsRowMobile, { gap: spacing.sm }]}>
-                  <Button 
-                    title="Liberar permissao" 
-                    variant="secondary" 
-                    onPress={requestAlarmNotificationPermission as any} 
+                  <Button
+                    title="Liberar permissao"
+                    variant="secondary"
+                    onPress={requestAlarmNotificationPermission as any}
                     style={styles.actionButton}
                     size={isMobile ? "md" : "lg"}
                   />
-                  <Button 
-                    title={isMobile ? "Testar alarme" : "Enviar teste em 10s"} 
-                    variant="ai" 
-                    onPress={handleTestAlarm} 
+                  <Button
+                    title={isMobile ? "Testar alarme" : "Enviar teste em 10s"}
+                    variant="ai"
+                    onPress={handleTestAlarm}
                     style={styles.actionButton}
                     size={isMobile ? "md" : "lg"}
                   />
                 </View>
-                <View style={[styles.infoStrip, isMobile && styles.infoStripMobile]}>
-                  <Text style={[styles.infoStripText, { fontSize: scaledFont(12, width) }]}>
+                <View style={[styles.infoStrip, { backgroundColor: theme.primarySoft }, isMobile && styles.infoStripMobile]}>
+                  <Text style={[styles.infoStripText, { color: theme.primaryDark, fontSize: scaledFont(12, width) }]}>
                     i As notificacoes sao locais deste dispositivo e nao ficam salvas em nuvem.
                   </Text>
                 </View>
@@ -225,32 +233,32 @@ export default function SettingsScreen() {
 
               {/* Alarm Preview Card */}
               <Card style={[styles.alarmPreviewCard, isMobile && styles.alarmPreviewCardMobile]}>
-                <SectionTitle 
-                  title="Alarme de teste" 
-                  subtitle="Previa da notificacao que sera enviada." 
+                <SectionTitle
+                  title="Alarme de teste"
+                  subtitle="Previa da notificacao que sera enviada."
                 />
                 <View style={[styles.previewRow, isMobile && styles.previewRowMobile]}>
-                  <View style={[styles.notificationPreview, isMobile && styles.notificationPreviewMobile]}>
-                    <View style={[styles.previewIcon, isMobile && styles.previewIconMobile]}>
+                  <View style={[styles.notificationPreview, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }, isMobile && styles.notificationPreviewMobile]}>
+                    <View style={[styles.previewIcon, { backgroundColor: theme.accentSoft }, isMobile && styles.previewIconMobile]}>
                       <Text style={[styles.previewIconText, { fontSize: scaledFont(isMobile ? 14 : 16, width) }]}>AI</Text>
                     </View>
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={[styles.previewApp, { fontSize: scaledFont(12, width) }]}>
-                        Rotina AI <Text style={styles.previewNow}>agora</Text>
+                        Rotina AI <Text style={[styles.previewNow, { color: theme.textSoft }]}>agora</Text>
                       </Text>
-                      <Text style={[styles.previewTitle, { fontSize: scaledFont(14, width) }]}>
+                      <Text style={[styles.previewTitle, { color: theme.text, fontSize: scaledFont(14, width) }]}>
                         Este e um alarme de teste
                       </Text>
-                      <Text style={[styles.previewText, { fontSize: scaledFont(12, width) }]}>
+                      <Text style={[styles.previewText, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>
                         Se voce esta vendo esta mensagem, suas notificacoes estao funcionando.
                       </Text>
                     </View>
                   </View>
                   {!isMobile && (
                     <View style={styles.timeline}>
-                      <Text style={styles.timelineItem}>00s  Enviando notificacao...</Text>
-                      <Text style={styles.timelineItem}>02s  Entregando ao dispositivo...</Text>
-                      <Text style={styles.timelineItem}>04s  Exibindo notificacao</Text>
+                      <Text style={[styles.timelineItem, { color: theme.textMuted }]}>00s  Enviando notificacao...</Text>
+                      <Text style={[styles.timelineItem, { color: theme.textMuted }]}>02s  Entregando ao dispositivo...</Text>
+                      <Text style={[styles.timelineItem, { color: theme.textMuted }]}>04s  Exibindo notificacao</Text>
                       <Text style={[styles.timelineItem, styles.timelineDone]}>10s  Concluido!</Text>
                     </View>
                   )}
@@ -260,11 +268,57 @@ export default function SettingsScreen() {
 
             {/* Right Column */}
             <View style={[styles.rightColumn, isMobile && styles.columnMobile, { gap }]}>
+              <Card style={[styles.themeCard, isMobile && styles.themeCardMobile]}>
+                <SectionTitle
+                  title="Aparencia"
+                  subtitle="Escolha como o Rotina AI deve aparecer em todo o app."
+                />
+                <View style={[styles.themeOptions, isMobile && styles.themeOptionsMobile]}>
+                  {[
+                    { key: "light", label: "Claro", icon: "white-balance-sunny" },
+                    { key: "dark", label: "Escuro", icon: "weather-night" }
+                  ].map((item) => {
+                    const active = mode === item.key;
+
+                    return (
+                      <Pressable
+                        key={item.key}
+                        style={[
+                          styles.themeOption,
+                          {
+                            backgroundColor: active ? theme.primarySoft : theme.surfaceMuted,
+                            borderColor: active ? theme.primary : theme.border
+                          }
+                        ]}
+                        onPress={() => setMode(item.key as "light" | "dark")}
+                      >
+                        <IconSymbol
+                          name={item.icon}
+                          size={20}
+                          color={active ? theme.primary : theme.textMuted}
+                        />
+                        <Text
+                          style={[
+                            styles.themeOptionText,
+                            { color: active ? theme.primary : theme.text }
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text style={[styles.themeHint, { color: theme.textMuted }]}>
+                  Tema atual: {isDark ? "modo escuro" : "modo claro"}.
+                </Text>
+              </Card>
+
               {/* Health Card */}
               <Card style={[styles.healthCard, isMobile && styles.healthCardMobile]}>
-                <SectionTitle 
-                  title="Saude das notificacoes" 
-                  subtitle="Status do sistema de notificacoes." 
+                <SectionTitle
+                  title="Saude das notificacoes"
+                  subtitle="Status do sistema de notificacoes."
                 />
                 <Metric label="Canal ativo" value="Local notifications" tone="green" width={width} isMobile={isMobile} />
                 <Metric label="Ultimo teste" value="Aguardando validacao" tone="blue" width={width} isMobile={isMobile} />
@@ -277,9 +331,9 @@ export default function SettingsScreen() {
                   title="Toque do alarme"
                   subtitle="Audio personalizado para alarmes ativos."
                 />
-                <View style={styles.ringtoneInfo}>
-                  <Text style={[styles.ringtoneLabel, { fontSize: scaledFont(12, width) }]}>Arquivo atual</Text>
-                  <Text style={[styles.ringtoneName, { fontSize: scaledFont(14, width) }]} numberOfLines={2}>
+                <View style={[styles.ringtoneInfo, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
+                  <Text style={[styles.ringtoneLabel, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>Arquivo atual</Text>
+                  <Text style={[styles.ringtoneName, { color: theme.text, fontSize: scaledFont(14, width) }]} numberOfLines={2}>
                     {customRingtone?.name || "Som padrao"}
                   </Text>
                 </View>
@@ -313,16 +367,16 @@ export default function SettingsScreen() {
 
               {/* Help Card */}
               <Card style={[styles.helpCard, isMobile && styles.helpCardMobile]}>
-                <Text style={[styles.helpTitle, { fontSize: scaledFont(isMobile ? 16 : 18, width) }]}>
+                <Text style={[styles.helpTitle, { color: theme.text, fontSize: scaledFont(isMobile ? 16 : 18, width) }]}>
                   Precisa de ajuda?
                 </Text>
-                <Text style={[styles.helpText, { fontSize: scaledFont(13, width) }]}>
+                <Text style={[styles.helpText, { color: theme.textMuted, fontSize: scaledFont(13, width) }]}>
                   Faca testes regulares apos instalar uma nova build ou alterar permissoes do Android.
                 </Text>
-                <Button 
-                  title="Voltar para inicio" 
-                  variant="secondary" 
-                  onPress={() => router.push("/home")} 
+                <Button
+                  title="Voltar para inicio"
+                  variant="secondary"
+                  onPress={() => router.push("/home")}
                   style={{ marginTop: spacing.md }}
                   size={isMobile ? "md" : "lg"}
                   fullWidth
@@ -367,22 +421,22 @@ export default function SettingsScreen() {
 
               {/* Credits Card */}
               <Card style={[styles.creditsCard, isMobile && styles.creditsCardMobile]}>
-                <Text style={[styles.creditsTitle, { fontSize: scaledFont(isMobile ? 16 : 18, width) }]}>
+                <Text style={[styles.creditsTitle, { color: theme.text, fontSize: scaledFont(isMobile ? 16 : 18, width) }]}>
                   Sobre o App
                 </Text>
-                <Text style={[styles.creditsText, { fontSize: scaledFont(13, width) }]}>
+                <Text style={[styles.creditsText, { color: theme.textMuted, fontSize: scaledFont(13, width) }]}>
                   Rotina AI - Gerenciador de Rotinas Inteligente
                 </Text>
-                <Text style={[styles.creditsText, { fontSize: scaledFont(12, width) }]}>
+                <Text style={[styles.creditsText, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>
                   Criador: William Oliveira Dos Santos
                 </Text>
-                <Text style={[styles.creditsText, { fontSize: scaledFont(12, width) }]}>
+                <Text style={[styles.creditsText, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>
                   Contato: william100william@gmail.com
                 </Text>
-                <Text style={[styles.creditsText, { fontSize: scaledFont(12, width) }]}>
+                <Text style={[styles.creditsText, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>
                   Conta Expo: williamdevbackend
                 </Text>
-                <Text style={[styles.creditsText, { fontSize: scaledFont(12, width) }]}>
+                <Text style={[styles.creditsText, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>
                   Versao 1.2.0
                 </Text>
               </Card>
@@ -394,228 +448,263 @@ export default function SettingsScreen() {
   );
 }
 
-function Metric({ 
-  label, 
-  value, 
+function Metric({
+  label,
+  value,
   tone,
   width,
   isMobile
-}: { 
-  label: string; 
-  value: string; 
+}: {
+  label: string;
+  value: string;
   tone: "green" | "blue" | "orange";
   width: number;
   isMobile: boolean;
 }) {
-  const color = tone === "green" ? colors.success : tone === "orange" ? colors.warning : colors.primary;
+  const { theme } = useThemeMode();
+  const color = tone === "green" ? theme.success : tone === "orange" ? theme.warning : theme.primary;
   return (
-    <View style={[styles.metric, isMobile && styles.metricMobile]}>
+    <View style={[styles.metric, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }, isMobile && styles.metricMobile]}>
       <View style={[styles.metricDot, { backgroundColor: color }]} />
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={[styles.metricLabel, { fontSize: scaledFont(13, width) }]}>{label}</Text>
-        <Text style={[styles.metricValue, { fontSize: scaledFont(12, width) }]} numberOfLines={1}>{value}</Text>
+        <Text style={[styles.metricLabel, { color: theme.text, fontSize: scaledFont(13, width) }]}>{label}</Text>
+        <Text style={[styles.metricValue, { color: theme.textMuted, fontSize: scaledFont(12, width) }]} numberOfLines={1}>{value}</Text>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  backButton: { 
-    height: 40, 
-    paddingHorizontal: spacing.md, 
-    borderRadius: radius.md, 
-    backgroundColor: colors.surface, 
-    borderWidth: 1, 
-    borderColor: colors.border, 
-    alignItems: "center", 
-    justifyContent: "center" 
+  backButton: {
+    height: 40,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center"
   },
   backButtonSmall: {
     height: 36,
     paddingHorizontal: spacing.sm
   },
-  backText: { 
-    color: colors.text, 
-    fontFamily: fonts.bold 
+  backText: {
+    color: colors.text,
+    fontFamily: fonts.bold
   },
-  
-  grid: { 
-    flexDirection: "row", 
-    gap: spacing.xl, 
-    alignItems: "flex-start" 
+
+  grid: {
+    flexDirection: "row",
+    gap: spacing.xl,
+    alignItems: "flex-start"
   },
   gridMobile: {
     flexDirection: "column",
     gap: spacing.md
   },
-  
-  leftColumn: { 
-    flex: 1.7 
+
+  leftColumn: {
+    flex: 1.7
   },
-  rightColumn: { 
-    flex: 0.78 
+  rightColumn: {
+    flex: 0.78
   },
   columnMobile: {
     flex: 1,
     width: "100%"
   },
-  
-  validationCard: { 
-    padding: spacing.lg, 
-    borderColor: "#C7D7FE" 
+  themeCard: {
+    padding: spacing.lg
+  },
+  themeCardMobile: {
+    padding: spacing.md
+  },
+  themeOptions: {
+    flexDirection: "row",
+    gap: spacing.sm
+  },
+  themeOptionsMobile: {
+    flexDirection: "column"
+  },
+  themeOption: {
+    flex: 1,
+    minHeight: 50,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm
+  },
+  themeOptionText: {
+    fontFamily: fonts.bold,
+    fontSize: 14
+  },
+  themeHint: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: spacing.md
+  },
+
+  validationCard: {
+    padding: spacing.lg,
+    borderColor: "#C7D7FE"
   },
   validationCardMobile: {
     padding: spacing.md
   },
-  
-  statusGrid: { 
-    flexDirection: "row", 
-    marginBottom: spacing.md 
+
+  statusGrid: {
+    flexDirection: "row",
+    marginBottom: spacing.md
   },
   statusGridMobile: {
     flexDirection: "column"
   },
-  
-  statusBox: { 
-    flex: 1, 
-    borderRadius: radius.lg, 
-    borderWidth: 1, 
-    borderColor: colors.border, 
-    backgroundColor: colors.surfaceMuted, 
-    padding: spacing.md 
+
+  statusBox: {
+    flex: 1,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+    padding: spacing.md
   },
   statusBoxMobile: {
     padding: spacing.sm
   },
-  
-  statusLabel: { 
-    color: colors.textMuted, 
-    fontFamily: fonts.medium 
+
+  statusLabel: {
+    color: colors.textMuted,
+    fontFamily: fonts.medium
   },
-  statusGood: { 
-    color: colors.success, 
-    fontFamily: fonts.title, 
-    marginTop: 4 
+  statusGood: {
+    color: colors.success,
+    fontFamily: fonts.title,
+    marginTop: 4
   },
-  statusWarn: { 
-    color: colors.warning, 
-    fontFamily: fonts.title, 
-    marginTop: 4 
+  statusWarn: {
+    color: colors.warning,
+    fontFamily: fonts.title,
+    marginTop: 4
   },
-  statusSub: { 
-    color: colors.textMuted, 
-    fontFamily: fonts.regular, 
-    marginTop: 4 
+  statusSub: {
+    color: colors.textMuted,
+    fontFamily: fonts.regular,
+    marginTop: 4
   },
-  
-  actionsRow: { 
-    flexDirection: "row" 
+
+  actionsRow: {
+    flexDirection: "row"
   },
   actionsRowMobile: {
     flexDirection: "column"
   },
-  actionButton: { 
-    flex: 1 
+  actionButton: {
+    flex: 1
   },
-  
-  infoStrip: { 
-    marginTop: spacing.md, 
-    borderRadius: radius.md, 
-    backgroundColor: colors.primarySoft, 
-    padding: spacing.md 
+
+  infoStrip: {
+    marginTop: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    padding: spacing.md
   },
   infoStripMobile: {
     padding: spacing.sm
   },
-  infoStripText: { 
-    color: colors.primaryDark, 
-    fontFamily: fonts.medium 
+  infoStripText: {
+    color: colors.primaryDark,
+    fontFamily: fonts.medium
   },
-  
-  alarmPreviewCard: { 
-    padding: spacing.lg 
+
+  alarmPreviewCard: {
+    padding: spacing.lg
   },
   alarmPreviewCardMobile: {
     padding: spacing.md
   },
-  
-  previewRow: { 
-    flexDirection: "row", 
-    gap: spacing.lg, 
-    alignItems: "center" 
+
+  previewRow: {
+    flexDirection: "row",
+    gap: spacing.lg,
+    alignItems: "center"
   },
   previewRowMobile: {
     flexDirection: "column",
     alignItems: "stretch"
   },
-  
-  notificationPreview: { 
-    flex: 1, 
-    flexDirection: "row", 
-    gap: spacing.md, 
-    alignItems: "center", 
-    backgroundColor: colors.surfaceMuted, 
-    borderRadius: radius.lg, 
-    padding: spacing.md, 
-    borderWidth: 1, 
-    borderColor: colors.border 
+
+  notificationPreview: {
+    flex: 1,
+    flexDirection: "row",
+    gap: spacing.md,
+    alignItems: "center",
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border
   },
   notificationPreviewMobile: {
     padding: spacing.sm
   },
-  
-  previewIcon: { 
-    width: 48, 
-    height: 48, 
-    borderRadius: 16, 
-    backgroundColor: colors.accentSoft, 
-    alignItems: "center", 
-    justifyContent: "center" 
+
+  previewIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: colors.accentSoft,
+    alignItems: "center",
+    justifyContent: "center"
   },
   previewIconMobile: {
     width: 42,
     height: 42,
     borderRadius: 14
   },
-  previewIconText: { 
-    color: colors.accent, 
-    fontFamily: fonts.title 
+  previewIconText: {
+    color: colors.accent,
+    fontFamily: fonts.title
   },
-  previewApp: { 
-    color: colors.textMuted, 
-    fontFamily: fonts.medium 
+  previewApp: {
+    color: colors.textMuted,
+    fontFamily: fonts.medium
   },
-  previewNow: { 
-    color: colors.textSoft 
+  previewNow: {
+    color: colors.textSoft
   },
-  previewTitle: { 
-    color: colors.text, 
-    fontFamily: fonts.title, 
-    marginTop: 4 
+  previewTitle: {
+    color: colors.text,
+    fontFamily: fonts.title,
+    marginTop: 4
   },
-  previewText: { 
-    color: colors.textMuted, 
-    fontFamily: fonts.regular, 
-    lineHeight: 18, 
-    marginTop: 4 
+  previewText: {
+    color: colors.textMuted,
+    fontFamily: fonts.regular,
+    lineHeight: 18,
+    marginTop: 4
   },
-  
-  timeline: { 
-    width: 220, 
-    gap: spacing.sm 
+
+  timeline: {
+    width: 220,
+    gap: spacing.sm
   },
-  timelineItem: { 
-    color: colors.textMuted, 
+  timelineItem: {
+    color: colors.textMuted,
     fontFamily: fonts.medium,
     fontSize: 13
   },
-  timelineDone: { 
-    color: colors.success, 
-    fontFamily: fonts.bold 
+  timelineDone: {
+    color: colors.success,
+    fontFamily: fonts.bold
   },
-  
-  healthCard: { 
-    padding: spacing.lg 
+
+  healthCard: {
+    padding: spacing.lg
   },
   healthCardMobile: {
     padding: spacing.md
@@ -654,52 +743,52 @@ const styles = StyleSheet.create({
   ringtoneActionButton: {
     flex: 1
   },
-  
-  metric: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    gap: spacing.md, 
-    borderRadius: radius.md, 
-    borderWidth: 1, 
-    borderColor: colors.border, 
-    backgroundColor: colors.surfaceMuted, 
-    padding: spacing.md, 
-    marginBottom: spacing.sm 
+
+  metric: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+    padding: spacing.md,
+    marginBottom: spacing.sm
   },
   metricMobile: {
     padding: spacing.sm,
     gap: spacing.sm
   },
-  metricDot: { 
-    width: 8, 
-    height: 8, 
-    borderRadius: 4 
+  metricDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4
   },
-  metricLabel: { 
-    color: colors.text, 
-    fontFamily: fonts.bold 
+  metricLabel: {
+    color: colors.text,
+    fontFamily: fonts.bold
   },
-  metricValue: { 
-    color: colors.textMuted, 
-    fontFamily: fonts.regular, 
-    marginTop: 2 
+  metricValue: {
+    color: colors.textMuted,
+    fontFamily: fonts.regular,
+    marginTop: 2
   },
-  
-  helpCard: { 
-    padding: spacing.lg 
+
+  helpCard: {
+    padding: spacing.lg
   },
   helpCardMobile: {
     padding: spacing.md
   },
-  helpTitle: { 
-    color: colors.text, 
-    fontFamily: fonts.title 
+  helpTitle: {
+    color: colors.text,
+    fontFamily: fonts.title
   },
-  helpText: { 
+  helpText: {
     color: colors.textMuted,
     fontFamily: fonts.regular,
     lineHeight: 20,
-    marginTop: spacing.sm 
+    marginTop: spacing.sm
   },
 
   apiCard: {

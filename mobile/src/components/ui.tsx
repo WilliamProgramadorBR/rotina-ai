@@ -12,6 +12,8 @@ import {
   useWindowDimensions
 } from "react-native";
 import { colors, fonts, radius, shadow, spacing, typography, scaledFont } from "../theme";
+import { useThemeMode } from "../context/ThemeContext";
+import { IconSymbol, IconSymbolName } from "./IconSymbol";
 
 type ButtonProps = {
   title: string;
@@ -22,6 +24,7 @@ type ButtonProps = {
   size?: "sm" | "md" | "lg";
   style?: StyleProp<ViewStyle>;
   fullWidth?: boolean;
+  icon?: IconSymbolName | string;
 };
 
 export function Button({ 
@@ -32,9 +35,11 @@ export function Button({
   variant = "primary", 
   size = "md",
   style,
-  fullWidth = false
+  fullWidth = false,
+  icon
 }: ButtonProps) {
   const { width } = useWindowDimensions();
+  const { theme } = useThemeMode();
   const isDisabled = Boolean(disabled || loading);
   
   const sizeStyles = {
@@ -44,6 +49,20 @@ export function Button({
   };
   
   const currentSize = sizeStyles[size];
+  const variantStyle =
+    variant === "ai"
+      ? { backgroundColor: theme.accent, ...shadow.glow }
+      : variant === "secondary"
+      ? { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }
+      : variant === "ghost"
+      ? { backgroundColor: "transparent" }
+      : variant === "danger"
+      ? { backgroundColor: theme.danger }
+      : { backgroundColor: theme.primary, ...shadow.soft };
+  const textColor =
+    variant === "secondary" ? theme.text
+    : variant === "ghost" ? theme.primary
+    : theme.white;
 
   return (
     <Pressable
@@ -52,7 +71,7 @@ export function Button({
       style={({ pressed }) => [
         styles.button,
         { height: currentSize.height, paddingHorizontal: currentSize.paddingHorizontal },
-        styles[`button_${variant}`],
+        variantStyle,
         fullWidth && { width: "100%" },
         pressed && !isDisabled && { opacity: 0.88, transform: [{ scale: 0.99 }] },
         isDisabled && { opacity: 0.6 },
@@ -62,9 +81,18 @@ export function Button({
       {loading ? (
         <ActivityIndicator color={variant === "secondary" || variant === "ghost" ? colors.primary : colors.white} />
       ) : (
-        <Text style={[styles.buttonText, styles[`buttonText_${variant}`], { fontSize: currentSize.fontSize }]}>
-          {title}
-        </Text>
+        <>
+          {icon ? (
+            <IconSymbol
+              name={icon}
+              size={size === "sm" ? 16 : 18}
+              color={variant === "secondary" || variant === "ghost" ? theme.primary : theme.white}
+            />
+          ) : null}
+          <Text style={[styles.buttonText, { color: textColor, fontSize: currentSize.fontSize }]}>
+            {title}
+          </Text>
+        </>
       )}
     </Pressable>
   );
@@ -93,6 +121,7 @@ export function Input({
   ...props 
 }: InputProps) {
   const { width } = useWindowDimensions();
+  const { theme } = useThemeMode();
   const isSmall = width <= 360;
   
   const sizeStyles = {
@@ -106,22 +135,23 @@ export function Input({
   return (
     <View style={[styles.inputBlock, containerStyle]}>
       {label ? (
-        <Text style={[styles.label, { fontSize: scaledFont(13, width) }]}>{label}</Text>
+        <Text style={[styles.label, { color: theme.text, fontSize: scaledFont(13, width) }]}>{label}</Text>
       ) : null}
       <View style={[
         styles.inputShell, 
+        { backgroundColor: theme.surface, borderColor: theme.borderStrong },
         { minHeight: multiline ? 100 : currentSize.height },
         multiline && styles.inputShellMultiline,
         error && styles.inputShellError
       ]}>
         {left ? <View style={styles.inputLeft}>{left}</View> : null}
         <TextInput
-          placeholderTextColor={colors.textSoft}
+          placeholderTextColor={theme.textSoft}
           multiline={multiline}
           textAlignVertical={multiline ? "top" : "center"}
           style={[
             styles.input, 
-            { fontSize: currentSize.fontSize },
+            { color: theme.text, fontSize: currentSize.fontSize },
             multiline && styles.inputMultiline, 
             isSmall && { paddingHorizontal: spacing.md },
             style
@@ -131,9 +161,9 @@ export function Input({
         {right ? <View style={styles.inputRight}>{right}</View> : null}
       </View>
       {error ? (
-        <Text style={[styles.errorText, { fontSize: scaledFont(12, width) }]}>{error}</Text>
+        <Text style={[styles.errorText, { color: theme.danger, fontSize: scaledFont(12, width) }]}>{error}</Text>
       ) : hint ? (
-        <Text style={[styles.hint, { fontSize: scaledFont(12, width) }]}>{hint}</Text>
+        <Text style={[styles.hint, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>{hint}</Text>
       ) : null}
     </View>
   );
@@ -146,11 +176,12 @@ type CardProps = {
 };
 
 export function Card({ children, style, variant = "default" }: CardProps) {
+  const { theme, isDark } = useThemeMode();
   const variantStyles = {
-    default: styles.card,
-    elevated: [styles.card, styles.cardElevated],
-    outlined: [styles.card, styles.cardOutlined],
-    tech: [styles.card, styles.cardTech],
+    default: [styles.card, { backgroundColor: theme.surface, borderColor: theme.border }],
+    elevated: [styles.card, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }, styles.cardElevated],
+    outlined: [styles.card, { backgroundColor: "transparent", borderColor: theme.borderStrong }, styles.cardOutlined],
+    tech: [styles.card, { backgroundColor: isDark ? theme.surface : "rgba(17, 26, 46, 0.95)", borderColor: isDark ? theme.borderStrong : "rgba(79, 124, 255, 0.2)" }, styles.cardTech],
   };
 
   return (
@@ -162,12 +193,13 @@ export function Card({ children, style, variant = "default" }: CardProps) {
 
 export function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   const { width } = useWindowDimensions();
+  const { theme } = useThemeMode();
   
   return (
     <View style={styles.sectionTitleBlock}>
-      <Text style={[styles.sectionTitle, { fontSize: scaledFont(18, width) }]}>{title}</Text>
+      <Text style={[styles.sectionTitle, { color: theme.text, fontSize: scaledFont(18, width) }]}>{title}</Text>
       {subtitle ? (
-        <Text style={[styles.sectionSubtitle, { fontSize: scaledFont(14, width) }]}>{subtitle}</Text>
+        <Text style={[styles.sectionSubtitle, { color: theme.textMuted, fontSize: scaledFont(14, width) }]}>{subtitle}</Text>
       ) : null}
     </View>
   );
@@ -185,6 +217,7 @@ export function Chip({
   size?: "sm" | "md";
 }) {
   const { width } = useWindowDimensions();
+  const { theme } = useThemeMode();
   const isSmall = width <= 360;
   
   return (
@@ -192,7 +225,9 @@ export function Chip({
       onPress={onPress} 
       style={[
         styles.chip, 
+        { backgroundColor: theme.surface, borderColor: theme.border },
         active && styles.chipActive,
+        active && { backgroundColor: theme.primary, borderColor: theme.primary },
         size === "sm" && styles.chipSmall,
         isSmall && styles.chipCompact
       ]}
@@ -200,6 +235,7 @@ export function Chip({
       <Text style={[
         styles.chipText, 
         active && styles.chipTextActive,
+        { color: active ? theme.white : theme.textMuted },
         { fontSize: scaledFont(size === "sm" ? 12 : 13, width) }
       ]}>
         {label}
@@ -209,25 +245,32 @@ export function Chip({
 }
 
 export function EmptyState({ 
-  icon = "—", 
+  icon = "-",
+  iconName,
   title, 
   description, 
   action 
 }: { 
   icon?: string; 
+  iconName?: IconSymbolName | string;
   title: string; 
   description: string; 
   action?: React.ReactNode 
 }) {
   const { width } = useWindowDimensions();
+  const { theme } = useThemeMode();
   
   return (
     <Card style={styles.empty}>
       <View style={styles.emptyIconWrap}>
-        <Text style={styles.emptyIcon}>{icon}</Text>
+        {iconName ? (
+          <IconSymbol name={iconName} size={26} color={theme.primary} />
+        ) : (
+          <Text style={styles.emptyIcon}>{icon}</Text>
+        )}
       </View>
-      <Text style={[styles.emptyTitle, { fontSize: scaledFont(18, width) }]}>{title}</Text>
-      <Text style={[styles.emptyDescription, { fontSize: scaledFont(14, width) }]}>{description}</Text>
+      <Text style={[styles.emptyTitle, { color: theme.text, fontSize: scaledFont(18, width) }]}>{title}</Text>
+      <Text style={[styles.emptyDescription, { color: theme.textMuted, fontSize: scaledFont(14, width) }]}>{description}</Text>
       {action ? <View style={{ marginTop: spacing.lg, width: "100%" }}>{action}</View> : null}
     </Card>
   );
@@ -235,13 +278,14 @@ export function EmptyState({
 
 export function LoadingState({ label }: { label: string }) {
   const { width } = useWindowDimensions();
+  const { theme } = useThemeMode();
   
   return (
     <View style={styles.loading}>
       <View style={styles.loadingSpinner}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
-      <Text style={[styles.loadingText, { fontSize: scaledFont(14, width) }]}>{label}</Text>
+      <Text style={[styles.loadingText, { color: theme.textMuted, fontSize: scaledFont(14, width) }]}>{label}</Text>
     </View>
   );
 }
@@ -250,16 +294,19 @@ export function StatCard({
   title, 
   value, 
   icon, 
+  iconName,
   tone = "blue", 
   caption 
 }: { 
   title: string; 
   value: number | string; 
   icon?: string; 
+  iconName?: IconSymbolName | string;
   tone?: "blue" | "green" | "orange" | "violet" | "danger"; 
   caption?: string 
 }) {
   const { width } = useWindowDimensions();
+  const { theme } = useThemeMode();
   const isSmall = width <= 360;
   
   const toneStyle =
@@ -273,16 +320,30 @@ export function StatCard({
     <Card style={[styles.statCard, isSmall && styles.statCardCompact]}>
       <View style={styles.statTop}>
         <View style={[styles.statIcon, toneStyle, isSmall && styles.statIconSmall]}>
-          <Text style={[styles.statIconText, { fontSize: scaledFont(16, width) }]}>{icon || "•"}</Text>
+          {iconName ? (
+            <IconSymbol
+              name={iconName}
+              size={isSmall ? 16 : 18}
+              color={
+                tone === "green" ? theme.success
+                : tone === "orange" ? theme.warning
+                : tone === "violet" ? theme.accent
+                : tone === "danger" ? theme.danger
+                : theme.primary
+              }
+            />
+          ) : (
+            <Text style={[styles.statIconText, { fontSize: scaledFont(16, width) }]}>{icon || "-"}</Text>
+          )}
         </View>
-        <View style={styles.statBadge}>
-          <Text style={[styles.statBadgeText, { fontSize: scaledFont(10, width) }]}>Hoje</Text>
+        <View style={[styles.statBadge, { backgroundColor: theme.surfaceMuted }]}>
+          <Text style={[styles.statBadgeText, { color: theme.textMuted, fontSize: scaledFont(10, width) }]}>Hoje</Text>
         </View>
       </View>
-      <Text style={[styles.statValue, { fontSize: scaledFont(isSmall ? 22 : 26, width) }]}>{value}</Text>
-      <Text style={[styles.statTitle, { fontSize: scaledFont(12, width) }]}>{title}</Text>
+      <Text style={[styles.statValue, { color: theme.text, fontSize: scaledFont(isSmall ? 22 : 26, width) }]}>{value}</Text>
+      <Text style={[styles.statTitle, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>{title}</Text>
       {caption ? (
-        <Text style={[styles.statCaption, { fontSize: scaledFont(11, width) }]}>{caption}</Text>
+        <Text style={[styles.statCaption, { color: theme.textSoft, fontSize: scaledFont(11, width) }]}>{caption}</Text>
       ) : null}
     </Card>
   );
@@ -296,11 +357,13 @@ export function Divider({
   text?: string; 
   style?: StyleProp<ViewStyle>
 }) {
+  const { theme } = useThemeMode();
+
   return (
     <View style={[styles.dividerRow, style]}>
-      <View style={styles.divider} />
-      {text ? <Text style={styles.dividerText}>{text}</Text> : null}
-      {text ? <View style={styles.divider} /> : null}
+      <View style={[styles.divider, { backgroundColor: theme.border }]} />
+      {text ? <Text style={[styles.dividerText, { color: theme.textMuted }]}>{text}</Text> : null}
+      {text ? <View style={[styles.divider, { backgroundColor: theme.border }]} /> : null}
     </View>
   );
 }
@@ -314,11 +377,12 @@ export function Badge({
   variant?: "default" | "success" | "warning" | "danger" | "tech" 
 }) {
   const { width } = useWindowDimensions();
+  const { theme } = useThemeMode();
   const variantStyles = {
-    default: { bg: colors.primarySoft, text: colors.primary },
-    success: { bg: colors.successSoft, text: colors.success },
-    warning: { bg: colors.warningSoft, text: colors.warning },
-    danger: { bg: colors.dangerSoft, text: colors.danger },
+    default: { bg: theme.primarySoft, text: theme.primary },
+    success: { bg: theme.successSoft, text: theme.success },
+    warning: { bg: theme.warningSoft, text: theme.warning },
+    danger: { bg: theme.dangerSoft, text: theme.danger },
     tech: { bg: "rgba(79,124,255,0.15)", text: "#60A5FA" },
   };
   

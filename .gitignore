@@ -10,6 +10,8 @@ backend/.env
 backend/.env.*
 mobile/.env
 mobile/.env.*
+!/.env.example
+!/backend/.env.example
 
 # Expo / React Native
 .expo/

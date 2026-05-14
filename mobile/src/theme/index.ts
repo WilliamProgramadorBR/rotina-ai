@@ -15,6 +15,7 @@ export const palette = {
   white: "#FFFFFF",
   blue600: "#2563EB",
   blue500: "#3B82F6",
+  cyan500: "#06B6D4",
   cyan400: "#22D3EE",
   violet700: "#6D28D9",
   violet600: "#7C3AED",
@@ -30,11 +31,12 @@ export const palette = {
 };
 
 export const colors = {
-  background: "#F6F8FC",
-  backgroundSoft: "#EEF2F8",
+  background: "#F4F7FB",
+  backgroundSoft: "#EAF0F8",
   surface: "#FFFFFF",
   surfaceMuted: "#F1F5F9",
   surfaceElevated: "#FFFFFF",
+  surfaceGlass: "rgba(255,255,255,0.82)",
   sidebar: "#0B1220",
   sidebarSoft: "#111A2E",
   text: "#111827",
@@ -53,6 +55,7 @@ export const colors = {
   dangerSoft: "#FFF1F2",
   border: "#E2E8F0",
   borderStrong: "#CBD5E1",
+  focusRing: "#B9D3FF",
   dark: palette.ink900,
   darkSoft: palette.ink800,
   white: "#FFFFFF"
@@ -64,6 +67,7 @@ export const darkColors = {
   surface: "#111A2E",
   surfaceMuted: "#182238",
   surfaceElevated: "#121B2F",
+  surfaceGlass: "rgba(17,26,46,0.82)",
   sidebar: "#070B16",
   sidebarSoft: "#111A2E",
   text: "#F8FAFC",
@@ -82,6 +86,7 @@ export const darkColors = {
   dangerSoft: "#3A1420",
   border: "#24324A",
   borderStrong: "#334155",
+  focusRing: "#3159B8",
   dark: "#070B16",
   darkSoft: "#0B1220",
   white: "#FFFFFF"
@@ -92,6 +97,20 @@ export const gradients = {
   ai: ["#1D4ED8", "#7C3AED", "#22D3EE"],
   sidebar: ["#060A14", "#0B1220", "#111A2E"],
   danger: ["#3A1020", "#2A102A"]
+};
+
+export const aiColors = {
+  cobalt: "#2563EB",
+  violet: "#7C3AED",
+  cyan: "#06B6D4",
+  mint: "#10B981",
+  amber: "#F59E0B",
+  rose: "#E11D48",
+  ink: "#07101F",
+  panel: "#0B1220",
+  panelSoft: "#111A2E",
+  line: "rgba(148, 163, 184, 0.18)",
+  lineStrong: "rgba(96, 165, 250, 0.36)"
 };
 
 export const spacing = {
@@ -121,29 +140,22 @@ export const fonts = {
   title: "Manrope_800ExtraBold"
 };
 
-// Sistema de tipografia responsiva (base 16px)
 export const typography = {
-  // Títulos
   h1: { fontSize: 28, lineHeight: 34 },
   h2: { fontSize: 22, lineHeight: 28 },
   h3: { fontSize: 18, lineHeight: 24 },
   h4: { fontSize: 16, lineHeight: 22 },
-  // Corpo
   body: { fontSize: 15, lineHeight: 22 },
   bodySmall: { fontSize: 13, lineHeight: 18 },
-  // Labels
   label: { fontSize: 12, lineHeight: 16 },
-  caption: { fontSize: 11, lineHeight: 14 },
+  caption: { fontSize: 11, lineHeight: 14 }
 };
 
-// Função para escalar fontes baseado na largura da tela
 export function scaledFont(baseFontSize: number, screenWidth: number): number {
-  const baseWidth = 375; // iPhone SE
-  const scale = Math.min(screenWidth / baseWidth, 1.3);
-  return Math.round(baseFontSize * Math.max(scale, 0.85));
+  void screenWidth;
+  return baseFontSize;
 }
 
-// Função para escalar espaçamento
 export function scaledSpacing(baseSpacing: number, screenWidth: number): number {
   const baseWidth = 375;
   const scale = Math.min(screenWidth / baseWidth, 1.2);
@@ -167,8 +179,8 @@ export const shadow = {
     elevation: 6
   },
   glow: {
-    shadowColor: "#7C3AED",
-    shadowOpacity: 0.24,
+    shadowColor: "#2563EB",
+    shadowOpacity: 0.2,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 10 },
     elevation: 8
@@ -193,15 +205,25 @@ export type ScheduleCategory =
 export function getCategoryMeta(category: ScheduleCategory) {
   const normalized = String(category || "OTHER").toUpperCase();
 
-  const map: Record<string, { label: string; icon: string; color: string; background: string; border: string }> = {
-    HEALTH: { label: "Saúde", icon: "✚", color: colors.danger, background: colors.dangerSoft, border: "#FFE4E6" },
-    STUDY: { label: "Estudo", icon: "✦", color: colors.accent, background: colors.accentSoft, border: "#E9D5FF" },
-    WORKOUT: { label: "Treino", icon: "↗", color: colors.success, background: colors.successSoft, border: "#BBF7D0" },
-    WORK: { label: "Trabalho", icon: "■", color: colors.warning, background: colors.warningSoft, border: "#FED7AA" },
-    SLEEP: { label: "Sono", icon: "◑", color: "#4F46E5", background: "#EEF2FF", border: "#C7D2FE" },
-    WATER: { label: "Água", icon: "◌", color: "#0284C7", background: "#E0F2FE", border: "#BAE6FD" },
-    PERSONAL: { label: "Pessoal", icon: "●", color: "#7C3AED", background: "#F3E8FF", border: "#DDD6FE" },
-    OTHER: { label: "Outro", icon: "•", color: colors.textMuted, background: colors.surfaceMuted, border: colors.border }
+  const map: Record<
+    string,
+    {
+      label: string;
+      icon: string;
+      iconName: string;
+      color: string;
+      background: string;
+      border: string;
+    }
+  > = {
+    HEALTH: { label: "Saude", icon: "+", iconName: "heart-pulse", color: colors.danger, background: colors.dangerSoft, border: "#FFE4E6" },
+    STUDY: { label: "Estudo", icon: "*", iconName: "school-outline", color: colors.accent, background: colors.accentSoft, border: "#E9D5FF" },
+    WORKOUT: { label: "Treino", icon: "^", iconName: "run", color: colors.success, background: colors.successSoft, border: "#BBF7D0" },
+    WORK: { label: "Trabalho", icon: "#", iconName: "briefcase-outline", color: colors.warning, background: colors.warningSoft, border: "#FED7AA" },
+    SLEEP: { label: "Sono", icon: "o", iconName: "weather-night", color: "#4F46E5", background: "#EEF2FF", border: "#C7D2FE" },
+    WATER: { label: "Agua", icon: "~", iconName: "water-outline", color: "#0284C7", background: "#E0F2FE", border: "#BAE6FD" },
+    PERSONAL: { label: "Pessoal", icon: "P", iconName: "account-outline", color: "#7C3AED", background: "#F3E8FF", border: "#DDD6FE" },
+    OTHER: { label: "Outro", icon: "-", iconName: "dots-grid", color: colors.textMuted, background: colors.surfaceMuted, border: colors.border }
   };
 
   return map[normalized] || map.OTHER;
@@ -216,7 +238,7 @@ export function getPriorityMeta(priority: Priority) {
     LOW: { label: "Baixa", color: colors.success, background: colors.successSoft, border: "#BBF7D0" },
     NORMAL: { label: "Normal", color: colors.primary, background: colors.primarySoft, border: "#C7D7FE" },
     HIGH: { label: "Alta", color: colors.warning, background: colors.warningSoft, border: "#FED7AA" },
-    CRITICAL: { label: "Crítica", color: colors.danger, background: colors.dangerSoft, border: "#FFE4E6" }
+    CRITICAL: { label: "Critica", color: colors.danger, background: colors.dangerSoft, border: "#FFE4E6" }
   };
 
   return map[normalized] || map.NORMAL;
