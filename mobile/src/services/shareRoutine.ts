@@ -1,7 +1,6 @@
 import { RefObject } from "react";
 import { View, Platform } from "react-native";
 import * as Sharing from "expo-sharing";
-import ViewShot from "react-native-view-shot";
 
 export async function isSharingAvailable(): Promise<boolean> {
   try {
@@ -12,14 +11,18 @@ export async function isSharingAvailable(): Promise<boolean> {
 }
 
 export async function captureAndShare(
-  viewShotRef: RefObject<ViewShot>,
+  viewShotRef: RefObject<{ capture?: () => Promise<string> }>,
   fileName = "rotina-ai-rotina.png"
 ): Promise<void> {
   if (!viewShotRef.current) {
     throw new Error("Card de compartilhamento não está pronto.");
   }
 
-  const uri = await (viewShotRef.current as any).capture();
+  const uri = await viewShotRef.current.capture?.();
+
+  if (!uri) {
+    throw new Error("Nao foi possivel gerar a imagem da rotina.");
+  }
 
   const available = await Sharing.isAvailableAsync();
   if (!available) {

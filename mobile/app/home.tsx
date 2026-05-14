@@ -68,7 +68,7 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<"ALL" | "OVERDUE" | "PENDING" | "DONE">("ALL");
   const [isSharing, setIsSharing] = useState(false);
-  const shareCardRef = useRef<ViewShot>(null);
+  const shareCardRef = useRef<any>(null);
 
   const isMobileLayout = isPhone || isSmallPhone;
   const isCompact = isPhone || isPhoneLarge;
@@ -454,22 +454,21 @@ export default function HomeScreen() {
               )}
             </View>
           )}
+          <View style={styles.offscreen}>
+            <ViewShot ref={shareCardRef} options={{ format: "png", quality: 1 }}>
+              <ShareRoutineCard
+                userName={user?.name || "Usuario"}
+                date={formatLongDate()}
+                reminders={reminders}
+                doneCount={reminders.filter(isReminderDone).length}
+                totalCount={reminders.length}
+                streakDays={dashboardSummary?.streakDays || 0}
+              />
+            </ViewShot>
+          </View>
         </View>
       )}
 
-      {/* Card fora da tela para captura de imagem */}
-      <View style={styles.offscreen}>
-        <ViewShot ref={shareCardRef} options={{ format: "png", quality: 1 }}>
-          <ShareRoutineCard
-            userName={user?.name || "Usuário"}
-            date={formatLongDate()}
-            reminders={reminders}
-            doneCount={reminders.filter(isReminderDone).length}
-            totalCount={reminders.length}
-            streakDays={dashboardSummary?.streakDays || 0}
-          />
-        </ViewShot>
-      </View>
     </ScreenLayout>
   );
 }

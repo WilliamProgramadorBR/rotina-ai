@@ -106,7 +106,7 @@ export function RotinaWidget({ userName, streakDays, completionRate, reminders }
                 fontSize: 11,
                 fontFamily: "sans-serif-light",
                 marginRight: 8,
-                minWidth: 44,
+                width: 44,
               }}
             />
             <TextWidget
