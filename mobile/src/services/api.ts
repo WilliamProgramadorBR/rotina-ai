@@ -17,7 +17,7 @@ const LEGACY_API_URLS = new Set([
 ]);
 
 const DEFAULT_TIMEOUT_MS = 30000;
-const AI_TIMEOUT_MS = 90000;
+const AI_TIMEOUT_MS = 180000;
 const ENABLE_API_DEBUG_LOGS = __DEV__ && process.env.EXPO_PUBLIC_DEBUG_API === "true";
 let cachedApiBaseUrl: string | null = null;
 

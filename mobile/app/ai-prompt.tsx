@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Calendar } from "react-native-calendars";
 import { router, useLocalSearchParams } from "expo-router";
-import { api } from "../src/services/api";
+import { postAiScheduleSuggest } from "../src/services/api";
 import { colors, fonts, radius, shadow, spacing, scaledFont } from "../src/theme";
 import { Button, Card, Input } from "../src/components/ui";
 import { PageHeader } from "../src/components/PageHeader";
@@ -57,7 +57,7 @@ export default function AiPromptScreen() {
       }
 
       setIsSubmitting(true);
-      const response = await api.post("/ai/schedules/suggest", {
+      const response = await postAiScheduleSuggest({
         prompt: prompt.trim(),
         startDate,
         timezone: "America/Sao_Paulo"
