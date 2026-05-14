@@ -24,6 +24,7 @@
     "expo-notifications": "latest",
     "expo-router": "latest",
     "expo-secure-store": "latest",
+    "expo-sharing": "^55.0.19",
     "expo-status-bar": "latest",
     "expo-updates": "~55.0.21",
     "react": "19.2.0",
@@ -32,6 +33,7 @@
     "react-native-calendars": "^1.1314.0",
     "react-native-safe-area-context": "~5.6.2",
     "react-native-screens": "~4.23.0",
+    "react-native-view-shot": "^5.1.0",
     "react-native-web": "latest",
     "zod": "latest"
   },

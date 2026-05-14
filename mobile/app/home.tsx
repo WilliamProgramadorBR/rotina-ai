@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { router, useFocusEffect } from "expo-router";
 import { api } from "../src/services/api";
 import { getDashboardMetricsRequest } from "../src/services/metrics";
@@ -12,7 +12,9 @@ import { ScreenLayout } from "../src/components/ScreenLayout";
 import { ReminderCard } from "../src/components/ReminderCard";
 import { AiBadge, AiPanel } from "../src/components/AiVisual";
 import { IconSymbol } from "../src/components/IconSymbol";
+import { ShareRoutineCard } from "../src/components/ShareRoutineCard";
 import { createReminderLogRequest, snoozeReminderRequest } from "../src/services/reminders";
+import { captureAndShare } from "../src/services/shareRoutine";
 import { useResponsive } from "../src/hooks/useResponsive";
 import { useThemeMode } from "../src/context/ThemeContext";
 import {
@@ -21,6 +23,7 @@ import {
   isReminderOverdue,
   isReminderSkipped
 } from "../src/utils/reminderStatus";
+import ViewShot from "react-native-view-shot";
 import {
   Alert,
   Pressable,
@@ -64,9 +67,22 @@ export default function HomeScreen() {
   const [dashboardSummary, setDashboardSummary] = useState<DashboardMetrics["summary"] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<"ALL" | "OVERDUE" | "PENDING" | "DONE">("ALL");
+  const [isSharing, setIsSharing] = useState(false);
+  const shareCardRef = useRef<ViewShot>(null);
 
   const isMobileLayout = isPhone || isSmallPhone;
   const isCompact = isPhone || isPhoneLarge;
+
+  async function handleShare() {
+    try {
+      setIsSharing(true);
+      await captureAndShare(shareCardRef as any);
+    } catch (error: any) {
+      Alert.alert("Não foi possível compartilhar", error?.message || "Tente novamente.");
+    } finally {
+      setIsSharing(false);
+    }
+  }
 
   const loadTodayReminders = useCallback(async (silent = false) => {
     try {
@@ -179,19 +195,32 @@ export default function HomeScreen() {
             subtitle={formatLongDate()}
             onMenu={isWide ? undefined : openMenu}
             right={
-              <Pressable
-                style={[
-                  styles.notificationButton,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
-                  isSmallPhone && styles.notificationButtonSmall
-                ]}
-                onPress={() => router.push("/settings")}
-              >
-                <IconSymbol name="cog-outline" size={20} color={theme.text} />
-                <View style={styles.notificationDot}>
-                  <Text style={styles.notificationDotText}>3</Text>
-                </View>
-              </Pressable>
+              <View style={styles.headerActions}>
+                <Pressable
+                  style={[
+                    styles.headerBtn,
+                    { backgroundColor: theme.primarySoft, borderColor: theme.primary },
+                    isSharing && { opacity: 0.6 }
+                  ]}
+                  onPress={handleShare}
+                  disabled={isSharing || reminders.length === 0}
+                >
+                  <IconSymbol name="share-variant-outline" size={18} color={theme.primary} />
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.notificationButton,
+                    { backgroundColor: theme.surface, borderColor: theme.border },
+                    isSmallPhone && styles.notificationButtonSmall
+                  ]}
+                  onPress={() => router.push("/settings")}
+                >
+                  <IconSymbol name="cog-outline" size={20} color={theme.text} />
+                  <View style={styles.notificationDot}>
+                    <Text style={styles.notificationDotText}>3</Text>
+                  </View>
+                </Pressable>
+              </View>
             }
           />
 
@@ -427,6 +456,20 @@ export default function HomeScreen() {
           )}
         </View>
       )}
+
+      {/* Card fora da tela para captura de imagem */}
+      <View style={styles.offscreen}>
+        <ViewShot ref={shareCardRef} options={{ format: "png", quality: 1 }}>
+          <ShareRoutineCard
+            userName={user?.name || "Usuário"}
+            date={formatLongDate()}
+            reminders={reminders}
+            doneCount={reminders.filter(isReminderDone).length}
+            totalCount={reminders.length}
+            streakDays={dashboardSummary?.streakDays || 0}
+          />
+        </ViewShot>
+      </View>
     </ScreenLayout>
   );
 }
@@ -436,6 +479,27 @@ const styles = StyleSheet.create({
     flex: 1,
     width: "100%",
     minWidth: 0
+  },
+
+  offscreen: {
+    position: "absolute",
+    left: -9999,
+    top: 0
+  },
+
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm
+  },
+
+  headerBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center"
   },
 
   notificationButton: {
