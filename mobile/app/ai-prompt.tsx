@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Calendar } from "react-native-calendars";
 import { router, useLocalSearchParams } from "expo-router";
 import { api } from "../src/services/api";
 import { colors, fonts, radius, shadow, spacing, scaledFont } from "../src/theme";
@@ -34,7 +35,13 @@ export default function AiPromptScreen() {
   );
   const [prompt, setPrompt] = useState(prefillPrompt);
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [showCalendar, setShowCalendar] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  function formatDateDisplay(dateStr: string) {
+    const [year, month, day] = dateStr.split("-");
+    return `${day}/${month}/${year}`;
+  }
 
   const isMobile = isPhone || isSmallPhone;
 
@@ -107,30 +114,89 @@ export default function AiPromptScreen() {
 
           {/* Form Card */}
           <Card style={[styles.formCard, isMobile && styles.formCardMobile]}>
-            <Input 
-              label="O que voce quer organizar?" 
+            <Input
+              label="O que voce quer organizar?"
               placeholder={PROMPT_PLACEHOLDER}
-              multiline 
-              value={prompt} 
+              multiline
+              value={prompt}
               onChangeText={setPrompt}
               size={isMobile ? "md" : "lg"}
             />
-            <Input 
-              label="Data inicial" 
-              placeholder="YYYY-MM-DD" 
-              value={startDate} 
-              onChangeText={setStartDate}
-              size={isMobile ? "md" : "lg"}
-            />
-            <Button 
-              title="Gerar cronograma" 
+
+            {/* Date picker field */}
+            <View style={styles.dateWrapper}>
+              <Text style={[styles.dateLabel, { color: theme.text, fontSize: scaledFont(13, width) }]}>
+                Data inicial
+              </Text>
+              <Pressable
+                style={[styles.dateField, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}
+                onPress={() => setShowCalendar(true)}
+              >
+                <View style={[styles.dateIconBox, { backgroundColor: theme.primarySoft }]}>
+                  <IconSymbol name="calendar" size={18} color={theme.primary} />
+                </View>
+                <Text style={[styles.dateFieldText, { color: theme.text, fontSize: scaledFont(15, width) }]}>
+                  {formatDateDisplay(startDate)}
+                </Text>
+                <IconSymbol name="chevron-down" size={16} color={theme.textMuted} />
+              </Pressable>
+            </View>
+
+            <Button
+              title="Gerar cronograma"
               icon="auto-fix"
-              onPress={handleGenerate} 
+              onPress={handleGenerate}
               loading={isSubmitting}
               size={isMobile ? "md" : "lg"}
               fullWidth
             />
           </Card>
+
+          {/* Calendar modal */}
+          <Modal
+            visible={showCalendar}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowCalendar(false)}
+          >
+            <Pressable style={styles.modalOverlay} onPress={() => setShowCalendar(false)}>
+              <Pressable style={[styles.calendarCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <View style={styles.calendarHeader}>
+                  <Text style={[styles.calendarTitle, { color: theme.text, fontSize: scaledFont(15, width) }]}>
+                    Selecionar data inicial
+                  </Text>
+                  <Pressable onPress={() => setShowCalendar(false)}>
+                    <IconSymbol name="close" size={20} color={theme.textMuted} />
+                  </Pressable>
+                </View>
+                <Calendar
+                  current={startDate}
+                  onDayPress={(day) => {
+                    setStartDate(day.dateString);
+                    setShowCalendar(false);
+                  }}
+                  markedDates={{
+                    [startDate]: { selected: true, selectedColor: theme.primary }
+                  }}
+                  theme={{
+                    backgroundColor: "transparent",
+                    calendarBackground: "transparent",
+                    textSectionTitleColor: theme.textMuted,
+                    selectedDayBackgroundColor: theme.primary,
+                    selectedDayTextColor: "#ffffff",
+                    todayTextColor: theme.primary,
+                    dayTextColor: theme.text,
+                    textDisabledColor: theme.textSoft,
+                    arrowColor: theme.primary,
+                    monthTextColor: theme.text,
+                    textDayFontFamily: fonts.regular,
+                    textMonthFontFamily: fonts.bold,
+                    textDayHeaderFontFamily: fonts.medium,
+                  }}
+                />
+              </Pressable>
+            </Pressable>
+          </Modal>
 
           {/* Examples Section */}
           <View style={styles.examples}>
@@ -249,6 +315,60 @@ const styles = StyleSheet.create({
   },
   formCardMobile: {
     padding: spacing.md
+  },
+
+  dateWrapper: {
+    marginBottom: spacing.md
+  },
+  dateLabel: {
+    fontFamily: fonts.bold,
+    marginBottom: spacing.sm
+  },
+  dateField: {
+    height: 52,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.sm,
+    gap: spacing.sm
+  },
+  dateIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  dateFieldText: {
+    flex: 1,
+    fontFamily: fonts.regular
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing.lg
+  },
+  calendarCard: {
+    width: "100%",
+    maxWidth: 380,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    padding: spacing.md,
+    ...shadow.glow
+  },
+  calendarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.md
+  },
+  calendarTitle: {
+    fontFamily: fonts.bold
   },
   
   examples: { 
