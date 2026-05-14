@@ -1,12 +1,29 @@
 import { FastifyInstance } from "fastify";
-import { ZodError } from "zod";
+import { ZodError, z } from "zod";
 import { prisma } from "../lib/prisma";
 import { generateScheduleSuggestion } from "../services/ai-provider.service";
+import {
+  decryptReminder,
+  decryptSchedule,
+  encryptReminderData,
+  encryptScheduleData
+} from "../services/privateData.service";
 import {
   aiConfirmRequestSchema,
   aiSuggestRequestSchema,
   scheduleSuggestionSchema
 } from "../services/scheduleSuggestion.schema";
+
+const rescheduleRequestSchema = z.object({
+  reminderId: z.string(),
+  title: z.string(),
+  originalTime: z.string()
+});
+
+const rescheduleConfirmSchema = z.object({
+  reminderId: z.string(),
+  newTime: z.string().datetime()
+});
 
 function buildStartAt(date: string, time: string) {
   return new Date(`${date}T${time}:00`);
@@ -74,6 +91,10 @@ export async function iaRoutes(app: FastifyInstance) {
         message.includes("Timeout ao chamar Gemini") ||
         message.includes("Erro ao chamar Gemini") ||
         message.includes("Gemini") ||
+        message.includes("Hugging Face") ||
+        message.includes("HUGGINGFACE") ||
+        message.includes("Ollama") ||
+        message.includes("Todos os provedores de IA falharam") ||
         message.includes("JSON") ||
         message.includes("Unexpected token") ||
         message.includes("Unterminated string") ||
@@ -82,7 +103,7 @@ export async function iaRoutes(app: FastifyInstance) {
         return reply.status(502).send({
           message:
             "A IA não conseguiu gerar uma sugestão válida no momento. Tente novamente com um pedido mais objetivo.",
-          code: "GEMINI_GENERATION_FAILED",
+          code: "AI_GENERATION_FAILED",
           detail: message
         });
       }
@@ -104,24 +125,28 @@ export async function iaRoutes(app: FastifyInstance) {
       const schedule = await prisma.schedule.create({
         data: {
           userId,
-          title: suggestion.title,
-          description: suggestion.description || undefined,
-          notes: suggestion.notes || undefined,
-          linksJson: normalizeLinks(suggestion.links),
-          extraInfo: suggestion.extraInfo || undefined,
+          ...encryptScheduleData({
+            title: suggestion.title,
+            description: suggestion.description || undefined,
+            notes: suggestion.notes || undefined,
+            linksJson: normalizeLinks(suggestion.links),
+            extraInfo: suggestion.extraInfo || undefined
+          }),
           category: suggestion.category,
           sourceType: "AI_PROMPT",
           reminders: {
-            create: suggestion.reminders.map((reminder) => ({
-              title: reminder.title,
-              description: reminder.description || undefined,
-              notes: reminder.notes || undefined,
-              linksJson: normalizeLinks(reminder.links),
-              location: reminder.location || undefined,
-              priority: reminder.priority || "NORMAL",
-              startAt: buildStartAt(reminder.date, reminder.time),
-              timezone: reminder.timezone
-            }))
+            create: suggestion.reminders.map((reminder) =>
+              encryptReminderData({
+                title: reminder.title,
+                description: reminder.description || undefined,
+                notes: reminder.notes || undefined,
+                linksJson: normalizeLinks(reminder.links),
+                location: reminder.location || undefined,
+                priority: reminder.priority || "NORMAL",
+                startAt: buildStartAt(reminder.date, reminder.time),
+                timezone: reminder.timezone
+              })
+            )
           }
         },
         include: {
@@ -134,7 +159,7 @@ export async function iaRoutes(app: FastifyInstance) {
       });
 
       return reply.status(201).send({
-        schedule
+        schedule: decryptSchedule(schedule)
       });
     } catch (error: any) {
       request.log.error(error);
@@ -152,6 +177,73 @@ export async function iaRoutes(app: FastifyInstance) {
         code: "AI_CONFIRM_FAILED",
         detail: String(error?.message || "")
       });
+    }
+  });
+
+  app.post("/reschedule", async (request, reply) => {
+    try {
+      const { reminderId, title, originalTime } = rescheduleRequestSchema.parse(request.body);
+
+      const original = new Date(originalTime);
+      const now = new Date();
+
+      const laterToday = new Date(now);
+      laterToday.setMinutes(laterToday.getMinutes() + 60);
+
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(original.getHours(), original.getMinutes(), 0, 0);
+
+      const fmtTime = (d: Date) =>
+        d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+      const fmtDate = (d: Date) =>
+        d.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "short" });
+
+      const suggestedTime = laterToday < new Date(now.setHours(23, 0))
+        ? `hoje às ${fmtTime(laterToday)}`
+        : `amanhã às ${fmtTime(tomorrow)} (${fmtDate(tomorrow)})`;
+
+      const suggestedDate = laterToday < new Date(now.setHours(23, 0)) ? laterToday : tomorrow;
+
+      return reply.status(200).send({
+        suggestion: {
+          reminderId,
+          title,
+          originalTime,
+          suggestedTime,
+          suggestedTimeIso: suggestedDate.toISOString(),
+          reason: "Horário sugerido com base no seu dia atual para manter a atividade dentro do dia ou no próximo dia útil."
+        }
+      });
+    } catch (error: any) {
+      request.log.error(error);
+      return reply.status(500).send({ message: "Não foi possível sugerir um novo horário.", code: "RESCHEDULE_FAILED" });
+    }
+  });
+
+  app.post("/reschedule/confirm", async (request, reply) => {
+    try {
+      const userId = request.user.sub;
+      const { reminderId, newTime } = rescheduleConfirmSchema.parse(request.body);
+
+      const reminder = await prisma.reminder.findFirst({
+        where: { id: reminderId, schedule: { userId } }
+      });
+
+      if (!reminder) {
+        return reply.status(404).send({ message: "Lembrete não encontrado." });
+      }
+
+      const updated = await prisma.reminder.update({
+        where: { id: reminderId },
+        data: { startAt: new Date(newTime) }
+      });
+
+      return reply.status(200).send({ reminder: decryptReminder(updated) });
+    } catch (error: any) {
+      request.log.error(error);
+      return reply.status(500).send({ message: "Não foi possível confirmar o reagendamento.", code: "RESCHEDULE_CONFIRM_FAILED" });
     }
   });
 }

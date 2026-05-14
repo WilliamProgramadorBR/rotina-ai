@@ -39,6 +39,13 @@ enum ReminderAction {
   MISSED
 }
 
+enum AlarmLevel {
+  LEVE
+  IMPORTANTE
+  CRITICO
+  ROTINA
+}
+
 model User {
   id           String   @id @default(cuid())
   name         String
@@ -49,6 +56,7 @@ model User {
 
   schedules    Schedule[]
   reminderLogs ReminderLog[]
+  alarmLogs    AlarmLog[]
   aiRequests   AiRequest[]
 }
 
@@ -78,6 +86,7 @@ model Reminder {
   linksJson      String?
   location       String?
   priority       String?
+  alarmLevel     AlarmLevel     @default(IMPORTANTE)
   startAt        DateTime
   endAt          DateTime?
   recurrenceRule String?
@@ -100,6 +109,18 @@ model ReminderLog {
 
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   reminder   Reminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+}
+
+model AlarmLog {
+  id         String   @id @default(cuid())
+  userId     String
+  scheduleId String?
+  reminderId String?
+  alarmTime  DateTime
+  status     String   @default("scheduled")
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AiRequest {

@@ -8,6 +8,20 @@ export type ScheduleCategory =
   | "PERSONAL"
   | "OTHER";
 
+export type AlarmLevel = "LEVE" | "IMPORTANTE" | "CRITICO" | "ROTINA";
+
+export type AlarmLogStatus = "scheduled" | "fired" | "dismissed" | "snoozed" | "missed";
+
+export type AlarmLog = {
+  id: string;
+  userId: string;
+  scheduleId?: string | null;
+  reminderId?: string | null;
+  alarmTime: string;
+  status: AlarmLogStatus;
+  createdAt: string;
+};
+
 export type ScheduleSourceType =
   | "MANUAL"
   | "AI_PROMPT"
@@ -67,6 +81,9 @@ export type Reminder = {
   recurrenceRule?: string | null;
   timezone: string;
   status: ReminderStatus;
+  alarmLevel?: AlarmLevel | null;
+  priority?: string | null;
+  location?: string | null;
   createdAt: string;
   updatedAt: string;
   schedule?: Schedule;
