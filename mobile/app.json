@@ -27,6 +27,24 @@
       ],
       "expo-font",
       [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "RotinaWidget",
+              "label": "Rotina AI",
+              "description": "Seus lembretes e progresso do dia",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "updatePeriodMillis": 1800000,
+              "resizeMode": "horizontal|vertical"
+            }
+          ]
+        }
+      ],
+      [
         "expo-audio",
         {
           "recordAudioAndroid": false,

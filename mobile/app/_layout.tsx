@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { router } from "expo-router";
-import { ActivityIndicator, AppState, View } from "react-native";
+import { ActivityIndicator, AppState, Platform, View } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as Notifications from "expo-notifications";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { requestWidgetUpdate } from "react-native-android-widget";
 
 import {
   useFonts,
@@ -15,7 +16,7 @@ import {
 } from "@expo-google-fonts/inter";
 import { Manrope_800ExtraBold } from "@expo-google-fonts/manrope";
 
-import { AuthProvider } from "../src/context/AuthContext";
+import { AuthProvider, useAuth } from "../src/context/AuthContext";
 import { ThemeProvider, useThemeMode } from "../src/context/ThemeContext";
 import { AppUpdateInstaller } from "../src/components/AppUpdateInstaller";
 import { configureAlarmNotifications } from "../src/services/alarmNotifications";
@@ -23,7 +24,13 @@ import { openAlarmFromNotificationResponse } from "../src/services/alarmNavigati
 import { flushOfflineQueue } from "../src/services/offlineSync";
 import { scheduleWeeklyReport } from "../src/services/weeklyReport";
 import { getDashboardMetricsRequest } from "../src/services/metrics";
+import { listTodayRemindersRequest } from "../src/services/reminders";
+import { saveWidgetData, formatReminderTime } from "../src/services/widgetData";
+import { RotinaWidget } from "../src/widgets/RotinaWidget";
 import { colors } from "../src/theme";
+
+// Registers the background widget task handler — must be imported at module level
+import "../src/widgets/widgetTask";
 
 function AlarmNotificationObserver() {
   useEffect(() => {
@@ -102,6 +109,57 @@ function OfflineSyncObserver() {
   return null;
 }
 
+function WidgetDataObserver() {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    if (!user) return;
+
+    async function updateWidget() {
+      try {
+        const [metrics, reminders] = await Promise.all([
+          getDashboardMetricsRequest().catch(() => null),
+          listTodayRemindersRequest().catch(() => []),
+        ]);
+
+        const widgetData = {
+          userName: user!.name?.split(" ")[0] ?? "usuario",
+          streakDays: metrics?.summary.streakDays ?? 0,
+          completionRate: metrics?.summary.completionRate ?? 0,
+          reminders: reminders.map((r) => ({
+            time: formatReminderTime(r.startAt),
+            title: r.title,
+            done: r.status === "FINISHED",
+          })),
+        };
+
+        await saveWidgetData(widgetData);
+
+        await requestWidgetUpdate({
+          widgetName: "RotinaWidget",
+          renderWidget: () => <RotinaWidget {...widgetData} />,
+          widgetNotFound: () => {},
+        });
+      } catch (error) {
+        console.log("[WIDGET UPDATE ERROR]", error);
+      }
+    }
+
+    updateWidget();
+
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        updateWidget();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [user]);
+
+  return null;
+}
+
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
@@ -136,6 +194,7 @@ function RootLayoutContent() {
       <AlarmNotificationObserver />
       <WeeklyReportObserver />
       <OfflineSyncObserver />
+      <WidgetDataObserver />
       <AppUpdateInstaller />
       <StatusBar style={isDark ? "light" : "dark"} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background } }} />
