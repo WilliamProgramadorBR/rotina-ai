@@ -384,8 +384,8 @@ async function callOllama(prompt: string) {
         options: {
           temperature: 0,
           top_p: 0.9,
-          num_ctx: 2048,
-          num_predict: 1200
+          num_ctx: 8192,
+          num_predict: 4096
         },
         keep_alive: "2m"
       })
