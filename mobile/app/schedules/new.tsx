@@ -197,7 +197,7 @@ export default function NewScheduleScreen() {
   }
 
   return (
-    <ScreenLayout>
+    <ScreenLayout scroll={false}>
       {({ openMenu, isWide }) => (
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -218,6 +218,13 @@ export default function NewScheduleScreen() {
             }
           />
 
+          <ScrollView
+            style={styles.scrollView}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            contentContainerStyle={styles.scrollContent}
+          >
           {/* Preview colapsavel no mobile - aparece no topo */}
           {isMobileLayout && (
             <PreviewSection
@@ -482,6 +489,7 @@ export default function NewScheduleScreen() {
               />
             </Card>
           )}
+          </ScrollView>
         </KeyboardAvoidingView>
       )}
     </ScreenLayout>
@@ -491,6 +499,12 @@ export default function NewScheduleScreen() {
 const styles = StyleSheet.create({
   keyboardView: {
     flex: 1
+  },
+  scrollView: {
+    flex: 1
+  },
+  scrollContent: {
+    paddingBottom: spacing.xxxl * 2
   },
 
   backButton: {

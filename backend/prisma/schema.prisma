@@ -46,24 +46,44 @@ enum AlarmLevel {
   ROTINA
 }
 
+enum CollaborationRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum CollaborationInviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELED
+}
+
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  passwordHash String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String    @id @default(cuid())
+  name              String
+  email             String    @unique
+  passwordHash      String
+  acceptedPrivacyAt DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   schedules           Schedule[]
   reminderLogs        ReminderLog[]
   alarmLogs           AlarmLog[]
   aiRequests          AiRequest[]
   passwordResetTokens PasswordResetToken[]
+  ownedGroups         CollaborationGroup[]   @relation("CollaborationGroupOwner")
+  collaborationMemberships CollaborationMember[]
+  sentCollaborationInvites CollaborationInvite[] @relation("CollaborationInviteSender")
+  receivedCollaborationInvites CollaborationInvite[] @relation("CollaborationInviteRecipient")
+  assignedReminders   Reminder[]             @relation("ReminderAssignee")
 }
 
 model Schedule {
   id          String             @id @default(cuid())
   userId      String
+  groupId     String?
   title       String
   description String?
   notes       String?
@@ -75,12 +95,14 @@ model Schedule {
   updatedAt   DateTime           @updatedAt
 
   user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group       CollaborationGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
   reminders   Reminder[]
 }
 
 model Reminder {
   id             String         @id @default(cuid())
   scheduleId     String
+  assignedUserId String?
   title          String
   description    String?
   notes          String?
@@ -97,6 +119,7 @@ model Reminder {
   updatedAt      DateTime       @updatedAt
 
   schedule       Schedule      @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  assignedUser   User?         @relation("ReminderAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
   logs           ReminderLog[]
 }
 
@@ -146,4 +169,50 @@ model AiRequest {
   createdAt      DateTime @default(now())
 
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CollaborationGroup {
+  id          String   @id @default(cuid())
+  ownerId     String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner       User                  @relation("CollaborationGroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     CollaborationMember[]
+  invites     CollaborationInvite[]
+  schedules   Schedule[]
+}
+
+model CollaborationMember {
+  id        String            @id @default(cuid())
+  groupId   String
+  userId    String
+  role      CollaborationRole @default(MEMBER)
+  joinedAt  DateTime          @default(now())
+
+  group     CollaborationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+}
+
+model CollaborationInvite {
+  id            String                    @id @default(cuid())
+  groupId       String
+  email         String
+  invitedById   String
+  invitedUserId String?
+  status        CollaborationInviteStatus @default(PENDING)
+  message       String?
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+  acceptedAt    DateTime?
+
+  group         CollaborationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  invitedBy     User               @relation("CollaborationInviteSender", fields: [invitedById], references: [id], onDelete: Cascade)
+  invitedUser   User?              @relation("CollaborationInviteRecipient", fields: [invitedUserId], references: [id], onDelete: SetNull)
+
+  @@unique([groupId, email])
 }

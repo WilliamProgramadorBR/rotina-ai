@@ -8,6 +8,25 @@ import {
   encryptScheduleData
 } from "../services/privateData.service";
 
+function accessibleScheduleWhere(userId: string) {
+  return {
+    OR: [
+      {
+        userId
+      },
+      {
+        group: {
+          members: {
+            some: {
+              userId
+            }
+          }
+        }
+      }
+    ]
+  };
+}
+
 export async function schedulesRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
 
@@ -16,7 +35,7 @@ export async function schedulesRoutes(app: FastifyInstance) {
 
     const schedules = await prisma.schedule.findMany({
       where: {
-        userId
+        ...accessibleScheduleWhere(userId)
       },
       include: {
         reminders: {
@@ -44,11 +63,11 @@ export async function schedulesRoutes(app: FastifyInstance) {
 
   app.post("/", async (request, reply) => {
   const bodySchema = z.object({
-    title: z.string().min(2),
-    description: z.string().optional(),
-    notes: z.string().optional(),
-    links: z.array(z.string()).optional(),
-    extraInfo: z.string().optional(),
+    title: z.string().min(2).max(80),
+    description: z.string().max(300).optional(),
+    notes: z.string().max(500).optional(),
+    links: z.array(z.string().max(500)).max(20).optional(),
+    extraInfo: z.string().max(800).optional(),
     category: z
       .enum([
         "HEALTH",
@@ -117,7 +136,7 @@ export async function schedulesRoutes(app: FastifyInstance) {
     const schedule = await prisma.schedule.findFirst({
       where: {
         id,
-        userId
+        ...accessibleScheduleWhere(userId)
       },
       include: {
         reminders: {
@@ -157,7 +176,23 @@ export async function schedulesRoutes(app: FastifyInstance) {
     const schedule = await prisma.schedule.findFirst({
       where: {
         id,
-        userId
+        OR: [
+          {
+            userId
+          },
+          {
+            group: {
+              members: {
+                some: {
+                  userId,
+                  role: {
+                    in: ["OWNER", "ADMIN"]
+                  }
+                }
+              }
+            }
+          }
+        ]
       }
     });
 

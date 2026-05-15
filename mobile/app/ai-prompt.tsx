@@ -24,7 +24,7 @@ function getParamString(value: string | string[] | undefined) {
 }
 
 export default function AiPromptScreen() {
-  const { width, isPhone, isSmallPhone, gap } = useResponsive();
+  const { width, isPhone, isSmallPhone, isPhoneLarge, gap } = useResponsive();
   const { theme } = useThemeMode();
   const params = useLocalSearchParams<{
     prefillPrompt?: string | string[];
@@ -43,7 +43,7 @@ export default function AiPromptScreen() {
     return `${day}/${month}/${year}`;
   }
 
-  const isMobile = isPhone || isSmallPhone;
+  const isMobile = isPhone || isSmallPhone || isPhoneLarge;
 
   useEffect(() => {
     setPrompt(prefillPrompt);

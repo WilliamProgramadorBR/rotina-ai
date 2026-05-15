@@ -40,13 +40,13 @@ function InsightCard({ text, index }: { text: string; index: number }) {
 }
 
 export default function DashboardScreen() {
-  const { width, isPhone, isSmallPhone, gap } = useResponsive();
+  const { width, isPhone, isSmallPhone, isPhoneLarge, gap } = useResponsive();
   const { theme } = useThemeMode();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const isMobile = isPhone || isSmallPhone;
+  const isMobile = isPhone || isSmallPhone || isPhoneLarge;
 
   const loadMetrics = useCallback(async (silent = false) => {
     try {

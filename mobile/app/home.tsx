@@ -200,12 +200,15 @@ export default function HomeScreen() {
                   style={[
                     styles.headerBtn,
                     { backgroundColor: theme.primarySoft, borderColor: theme.primary },
-                    isSharing && { opacity: 0.6 }
+                    (isSharing || reminders.length === 0) && { opacity: 0.45 }
                   ]}
                   onPress={handleShare}
                   disabled={isSharing || reminders.length === 0}
                 >
                   <IconSymbol name="share-variant-outline" size={18} color={theme.primary} />
+                  <Text style={[styles.headerBtnLabel, { color: theme.primary }]}>
+                    {isSharing ? "..." : "Compartilhar"}
+                  </Text>
                 </Pressable>
                 <Pressable
                   style={[
@@ -493,12 +496,18 @@ const styles = StyleSheet.create({
   },
 
   headerBtn: {
-    width: 42,
     height: 42,
     borderRadius: 14,
     borderWidth: 1,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: spacing.md
+  },
+  headerBtnLabel: {
+    fontFamily: fonts.bold,
+    fontSize: 13
   },
 
   notificationButton: {

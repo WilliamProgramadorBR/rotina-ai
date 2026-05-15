@@ -13,6 +13,7 @@ import {
   aiSuggestRequestSchema,
   scheduleSuggestionSchema
 } from "../services/scheduleSuggestion.schema";
+import { createRateLimitPreHandler, getClientIp } from "../security/rateLimit";
 
 const rescheduleRequestSchema = z.object({
   reminderId: z.string(),
@@ -45,10 +46,20 @@ function normalizeLinks(links?: string[]) {
   return JSON.stringify(cleanedLinks);
 }
 
+const aiRateLimit = createRateLimitPreHandler({
+  scope: "ai",
+  max: 10,
+  windowMs: 60_000,
+  keyFn: (req) => {
+    const userId = (req as any).user?.sub;
+    return userId ? `user:${userId}` : getClientIp(req);
+  }
+});
+
 export async function iaRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
 
-  app.post("/schedules/suggest", async (request, reply) => {
+  app.post("/schedules/suggest", { preHandler: [aiRateLimit] }, async (request, reply) => {
     try {
       const { prompt, startDate, timezone } = aiSuggestRequestSchema.parse(
         request.body
@@ -74,7 +85,7 @@ export async function iaRoutes(app: FastifyInstance) {
         suggestion: parsedSuggestion
       });
     } catch (error: any) {
-      request.log.error(error);
+      request.log.error({ msg: String(error?.message || "").slice(0, 500), name: error?.name, code: error?.code });
 
       if (error instanceof ZodError) {
         return reply.status(422).send({
@@ -162,7 +173,7 @@ export async function iaRoutes(app: FastifyInstance) {
         schedule: decryptSchedule(schedule)
       });
     } catch (error: any) {
-      request.log.error(error);
+      request.log.error({ msg: String(error?.message || "").slice(0, 500), name: error?.name, code: error?.code });
 
       if (error instanceof ZodError) {
         return reply.status(422).send({
@@ -217,7 +228,7 @@ export async function iaRoutes(app: FastifyInstance) {
         }
       });
     } catch (error: any) {
-      request.log.error(error);
+      request.log.error({ msg: String(error?.message || "").slice(0, 500), name: error?.name, code: error?.code });
       return reply.status(500).send({ message: "Não foi possível sugerir um novo horário.", code: "RESCHEDULE_FAILED" });
     }
   });
@@ -242,7 +253,7 @@ export async function iaRoutes(app: FastifyInstance) {
 
       return reply.status(200).send({ reminder: decryptReminder(updated) });
     } catch (error: any) {
-      request.log.error(error);
+      request.log.error({ msg: String(error?.message || "").slice(0, 500), name: error?.name, code: error?.code });
       return reply.status(500).send({ message: "Não foi possível confirmar o reagendamento.", code: "RESCHEDULE_CONFIRM_FAILED" });
     }
   });

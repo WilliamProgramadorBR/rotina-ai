@@ -30,9 +30,9 @@ import { useThemeMode } from "../src/context/ThemeContext";
 import { IconSymbol } from "../src/components/IconSymbol";
 
 export default function SettingsScreen() {
-  const { width, isPhone, isSmallPhone, gap } = useResponsive();
+  const { width, isPhone, isSmallPhone, isPhoneLarge, gap } = useResponsive();
   const { mode, setMode, theme, isDark } = useThemeMode();
-  const isMobile = isPhone || isSmallPhone;
+  const isMobile = isPhone || isSmallPhone || isPhoneLarge;
   const [apiUrl, setApiUrl] = useState(getDefaultApiBaseUrl());
   const [isSavingApiUrl, setIsSavingApiUrl] = useState(false);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardMetrics["summary"] | null>(null);
@@ -216,8 +216,8 @@ export default function SettingsScreen() {
       {({ openMenu, isWide }) => (
         <View>
           <PageHeader
-            title="Teste de notificacao"
-            subtitle="Valide permissoes e garanta que seus alarmes sejam entregues"
+            title="Configuracoes"
+            subtitle="Personalize notificacoes, aparencia e conexao do app"
             onMenu={isWide ? undefined : openMenu}
             right={
               <Pressable
@@ -260,14 +260,14 @@ export default function SettingsScreen() {
                     title="Liberar permissao"
                     variant="secondary"
                     onPress={requestAlarmNotificationPermission as any}
-                    style={styles.actionButton}
+                    style={[styles.actionButton, isMobile && styles.actionButtonMobile]}
                     size={isMobile ? "md" : "lg"}
                   />
                   <Button
                     title={isMobile ? "Testar alarme" : "Enviar teste em 10s"}
                     variant="ai"
                     onPress={handleTestAlarm}
-                    style={styles.actionButton}
+                    style={[styles.actionButton, isMobile && styles.actionButtonMobile]}
                     size={isMobile ? "md" : "lg"}
                   />
                 </View>
@@ -320,7 +320,7 @@ export default function SettingsScreen() {
                   title="Aparencia"
                   subtitle="Escolha como o Rotina AI deve aparecer em todo o app."
                 />
-                <View style={[styles.themeOptions, isMobile && styles.themeOptionsMobile]}>
+                <View style={styles.themeOptions}>
                   {[
                     { key: "light", label: "Claro", icon: "white-balance-sunny" },
                     { key: "dark", label: "Escuro", icon: "weather-night" }
@@ -341,13 +341,13 @@ export default function SettingsScreen() {
                       >
                         <IconSymbol
                           name={item.icon}
-                          size={20}
+                          size={isMobile ? 18 : 20}
                           color={active ? theme.primary : theme.textMuted}
                         />
                         <Text
                           style={[
                             styles.themeOptionText,
-                            { color: active ? theme.primary : theme.text }
+                            { color: active ? theme.primary : theme.text, fontSize: scaledFont(13, width) }
                           ]}
                         >
                           {item.label}
@@ -384,29 +384,29 @@ export default function SettingsScreen() {
                     {customRingtone?.name || "Som padrao"}
                   </Text>
                 </View>
-                <View style={[styles.ringtoneActions, isMobile && styles.ringtoneActionsMobile]}>
+                <View style={[styles.ringtoneActions, isMobile && styles.ringtoneActionsMobile, { gap: spacing.sm }]}>
                   <Button
                     title={customRingtone ? "Trocar audio" : "Escolher audio"}
                     variant="ai"
                     onPress={handlePickRingtone}
                     loading={isPickingRingtone}
-                    style={styles.ringtoneActionButton}
+                    style={[styles.ringtoneActionButton, isMobile && styles.ringtoneActionButtonMobile]}
                     size={isMobile ? "md" : "lg"}
                   />
                   <Button
-                    title={isPreviewingRingtone ? "Parar" : "Ouvir"}
+                    title={isPreviewingRingtone ? "Parar preview" : "Ouvir toque"}
                     variant="secondary"
                     onPress={handleTogglePreviewRingtone}
                     disabled={!customRingtone || isPickingRingtone}
-                    style={styles.ringtoneActionButton}
+                    style={[styles.ringtoneActionButton, isMobile && styles.ringtoneActionButtonMobile]}
                     size={isMobile ? "md" : "lg"}
                   />
                   <Button
-                    title="Remover"
+                    title="Remover toque"
                     variant="danger"
                     onPress={handleClearRingtone}
                     disabled={!customRingtone || isPickingRingtone}
-                    style={styles.ringtoneActionButton}
+                    style={[styles.ringtoneActionButton, isMobile && styles.ringtoneActionButtonMobile]}
                     size={isMobile ? "md" : "lg"}
                   />
                 </View>
@@ -501,13 +501,13 @@ export default function SettingsScreen() {
                   size={isMobile ? "sm" : "md"}
                   hint={`Padrao: ${getDefaultApiBaseUrl()}`}
                 />
-                <View style={[styles.apiActions, isMobile && styles.apiActionsMobile]}>
+                <View style={[styles.apiActions, isMobile && styles.apiActionsMobile, { gap: spacing.sm }]}>
                   <Button
                     title="Salvar URL"
                     variant="ai"
                     onPress={handleSaveApiUrl}
                     loading={isSavingApiUrl}
-                    style={styles.apiActionButton}
+                    style={[styles.apiActionButton, isMobile && styles.apiActionButtonMobile]}
                     size={isMobile ? "md" : "lg"}
                   />
                   <Button
@@ -515,7 +515,7 @@ export default function SettingsScreen() {
                     variant="secondary"
                     onPress={handleResetApiUrl}
                     disabled={isSavingApiUrl}
-                    style={styles.apiActionButton}
+                    style={[styles.apiActionButton, isMobile && styles.apiActionButtonMobile]}
                     size={isMobile ? "md" : "lg"}
                   />
                 </View>
@@ -541,6 +541,13 @@ export default function SettingsScreen() {
                 <Text style={[styles.creditsText, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>
                   Versao 3.0.0
                 </Text>
+                <Button
+                  title="Privacidade e termos"
+                  icon="shield-lock-outline"
+                  variant="secondary"
+                  onPress={() => router.push("/privacy")}
+                  style={{ marginTop: spacing.md }}
+                />
               </Card>
             </View>
           </View>
@@ -578,14 +585,16 @@ function Metric({
 
 const styles = StyleSheet.create({
   backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
     height: 40,
     paddingHorizontal: spacing.md,
     borderRadius: radius.md,
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center"
+    borderColor: colors.border
   },
   backButtonSmall: {
     height: 36,
@@ -626,15 +635,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.sm
   },
-  themeOptionsMobile: {
-    flexDirection: "column"
-  },
   themeOption: {
     flex: 1,
     minHeight: 50,
     borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -700,13 +707,18 @@ const styles = StyleSheet.create({
   },
 
   actionsRow: {
-    flexDirection: "row"
+    flexDirection: "row",
+    gap: spacing.sm
   },
   actionsRowMobile: {
     flexDirection: "column"
   },
   actionButton: {
     flex: 1
+  },
+  actionButtonMobile: {
+    width: "100%",
+    flex: 0
   },
 
   infoStrip: {
@@ -845,6 +857,10 @@ const styles = StyleSheet.create({
   ringtoneActionButton: {
     flex: 1
   },
+  ringtoneActionButtonMobile: {
+    width: "100%",
+    flex: 0
+  },
 
   metric: {
     flexDirection: "row",
@@ -947,6 +963,10 @@ const styles = StyleSheet.create({
   },
   apiActionButton: {
     flex: 1
+  },
+  apiActionButtonMobile: {
+    width: "100%",
+    flex: 0
   },
 
   creditsCard: {

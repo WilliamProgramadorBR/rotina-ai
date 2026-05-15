@@ -1,0 +1,834 @@
+import { FastifyInstance } from "fastify";
+import { z } from "zod";
+import { prisma } from "../lib/prisma";
+import { withScheduleProgress } from "../services/metrics.service";
+import { generateScheduleSuggestion } from "../services/ai-provider.service";
+import {
+  aiSuggestRequestSchema,
+  scheduleSuggestionSchema
+} from "../services/scheduleSuggestion.schema";
+import {
+  decryptCollaborationGroup,
+  decryptCollaborationGroups,
+  decryptCollaborationInvite,
+  decryptCollaborationInvites,
+  decryptSchedule,
+  encryptCollaborationGroupData,
+  encryptCollaborationInviteData,
+  encryptReminderData,
+  encryptScheduleData
+} from "../services/privateData.service";
+
+const roleSchema = z.enum(["OWNER", "ADMIN", "MEMBER"]);
+
+const groupBodySchema = z.object({
+  name: z.string().trim().min(2).max(80),
+  description: z.string().trim().max(300).optional()
+});
+
+const inviteBodySchema = z.object({
+  email: z.string().trim().email().toLowerCase(),
+  message: z.string().trim().max(500).optional()
+});
+
+const scheduleBodySchema = z.object({
+  title: z.string().trim().min(2).max(80),
+  description: z.string().trim().max(300).optional(),
+  notes: z.string().trim().max(500).optional(),
+  links: z.array(z.string().max(500)).max(20).optional(),
+  extraInfo: z.string().trim().max(800).optional(),
+  category: z
+    .enum([
+      "HEALTH",
+      "STUDY",
+      "WORKOUT",
+      "WORK",
+      "SLEEP",
+      "WATER",
+      "PERSONAL",
+      "OTHER"
+    ])
+    .optional()
+});
+
+const assignReminderSchema = z.object({
+  assignedUserId: z.string().nullable()
+});
+
+function normalizeLinks(links?: string[]) {
+  if (!links || links.length === 0) {
+    return undefined;
+  }
+
+  const cleanedLinks = links.map((link) => link.trim()).filter(Boolean);
+
+  return cleanedLinks.length > 0 ? JSON.stringify(cleanedLinks) : undefined;
+}
+
+function buildStartAt(date: string, time: string) {
+  return new Date(`${date}T${time}:00`);
+}
+
+async function findMembership(groupId: string, userId: string) {
+  return prisma.collaborationMember.findUnique({
+    where: {
+      groupId_userId: {
+        groupId,
+        userId
+      }
+    }
+  });
+}
+
+async function requireMembership(groupId: string, userId: string, reply: any) {
+  const membership = await findMembership(groupId, userId);
+
+  if (!membership) {
+    reply.status(404).send({
+      message: "Grupo colaborativo nao encontrado."
+    });
+    return null;
+  }
+
+  return membership;
+}
+
+async function requireManager(groupId: string, userId: string, reply: any) {
+  const membership = await requireMembership(groupId, userId, reply);
+
+  if (!membership) {
+    return null;
+  }
+
+  if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
+    reply.status(403).send({
+      message: "Voce nao tem permissao para gerenciar este grupo."
+    });
+    return null;
+  }
+
+  return membership;
+}
+
+function groupInclude() {
+  return {
+    owner: {
+      select: {
+        id: true,
+        name: true,
+        email: true
+      }
+    },
+    members: {
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        joinedAt: "asc" as const
+      }
+    },
+    invites: {
+      include: {
+        invitedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        invitedUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "desc" as const
+      }
+    },
+    schedules: {
+      include: {
+        reminders: {
+          include: {
+            logs: {
+              orderBy: {
+                createdAt: "desc" as const
+              }
+            },
+            assignedUser: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: {
+            startAt: "asc" as const
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "desc" as const
+      }
+    }
+  };
+}
+
+function addProgressToGroup(group: any) {
+  const decrypted = decryptCollaborationGroup(group);
+
+  return {
+    ...decrypted,
+    schedules: (decrypted.schedules || []).map(withScheduleProgress)
+  };
+}
+
+export async function collaborationRoutes(app: FastifyInstance) {
+  app.addHook("preHandler", app.authenticate);
+
+  app.get("/groups", async (request) => {
+    const userId = request.user.sub;
+
+    const groups = await prisma.collaborationGroup.findMany({
+      where: {
+        members: {
+          some: {
+            userId
+          }
+        }
+      },
+      include: groupInclude(),
+      orderBy: {
+        updatedAt: "desc"
+      }
+    });
+
+    return {
+      groups: decryptCollaborationGroups(groups).map((group: any) => ({
+        ...group,
+        schedules: (group.schedules || []).map(withScheduleProgress)
+      }))
+    };
+  });
+
+  app.post("/groups", async (request, reply) => {
+    const userId = request.user.sub;
+    const data = groupBodySchema.parse(request.body);
+
+    const group = await prisma.collaborationGroup.create({
+      data: {
+        ownerId: userId,
+        ...encryptCollaborationGroupData({
+          name: data.name,
+          description: data.description
+        }),
+        members: {
+          create: {
+            userId,
+            role: "OWNER"
+          }
+        }
+      },
+      include: groupInclude()
+    });
+
+    return reply.status(201).send({
+      group: addProgressToGroup(group)
+    });
+  });
+
+  app.get("/groups/:groupId", async (request, reply) => {
+    const paramsSchema = z.object({
+      groupId: z.string()
+    });
+
+    const userId = request.user.sub;
+    const { groupId } = paramsSchema.parse(request.params);
+
+    const membership = await requireMembership(groupId, userId, reply);
+    if (!membership) return;
+
+    const group = await prisma.collaborationGroup.findUnique({
+      where: {
+        id: groupId
+      },
+      include: groupInclude()
+    });
+
+    if (!group) {
+      return reply.status(404).send({
+        message: "Grupo colaborativo nao encontrado."
+      });
+    }
+
+    return {
+      group: addProgressToGroup(group)
+    };
+  });
+
+  app.patch("/groups/:groupId", async (request, reply) => {
+    const paramsSchema = z.object({
+      groupId: z.string()
+    });
+
+    const bodySchema = groupBodySchema.partial().refine((data) => Object.keys(data).length > 0, {
+      message: "Informe ao menos um campo para atualizar."
+    });
+
+    const userId = request.user.sub;
+    const { groupId } = paramsSchema.parse(request.params);
+    const data = bodySchema.parse(request.body);
+
+    const manager = await requireManager(groupId, userId, reply);
+    if (!manager) return;
+
+    const group = await prisma.collaborationGroup.update({
+      where: {
+        id: groupId
+      },
+      data: encryptCollaborationGroupData(data),
+      include: groupInclude()
+    });
+
+    return {
+      group: addProgressToGroup(group)
+    };
+  });
+
+  app.post("/groups/:groupId/invites", async (request, reply) => {
+    const paramsSchema = z.object({
+      groupId: z.string()
+    });
+
+    const userId = request.user.sub;
+    const { groupId } = paramsSchema.parse(request.params);
+    const data = inviteBodySchema.parse(request.body);
+
+    const manager = await requireManager(groupId, userId, reply);
+    if (!manager) return;
+
+    const currentUser = await prisma.user.findUnique({
+      where: {
+        id: userId
+      },
+      select: {
+        email: true
+      }
+    });
+
+    if (currentUser?.email === data.email) {
+      return reply.status(400).send({
+        message: "Voce ja faz parte deste grupo."
+      });
+    }
+
+    const invitedUser = await prisma.user.findUnique({
+      where: {
+        email: data.email
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true
+      }
+    });
+
+    if (invitedUser) {
+      const existingMember = await findMembership(groupId, invitedUser.id);
+
+      if (existingMember) {
+        return reply.status(409).send({
+          message: "Este usuario ja faz parte do grupo."
+        });
+      }
+    }
+
+    const invite = await prisma.collaborationInvite.upsert({
+      where: {
+        groupId_email: {
+          groupId,
+          email: data.email
+        }
+      },
+      create: {
+        groupId,
+        email: data.email,
+        invitedById: userId,
+        invitedUserId: invitedUser?.id,
+        status: "PENDING",
+        ...encryptCollaborationInviteData({
+          message: data.message
+        })
+      },
+      update: {
+        invitedById: userId,
+        invitedUserId: invitedUser?.id,
+        status: "PENDING",
+        acceptedAt: null,
+        ...encryptCollaborationInviteData({
+          message: data.message
+        })
+      },
+      include: {
+        group: {
+          include: groupInclude()
+        },
+        invitedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        invitedUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    return reply.status(201).send({
+      invite: decryptCollaborationInvite(invite)
+    });
+  });
+
+  app.get("/invites", async (request) => {
+    const userId = request.user.sub;
+
+    const user = await prisma.user.findUnique({
+      where: {
+        id: userId
+      },
+      select: {
+        email: true
+      }
+    });
+
+    const invites = await prisma.collaborationInvite.findMany({
+      where: {
+        status: "PENDING",
+        OR: [
+          {
+            invitedUserId: userId
+          },
+          {
+            email: user?.email || ""
+          }
+        ]
+      },
+      include: {
+        group: {
+          include: groupInclude()
+        },
+        invitedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+
+    return {
+      invites: decryptCollaborationInvites(invites)
+    };
+  });
+
+  app.post("/invites/:inviteId/accept", async (request, reply) => {
+    const paramsSchema = z.object({
+      inviteId: z.string()
+    });
+
+    const userId = request.user.sub;
+    const { inviteId } = paramsSchema.parse(request.params);
+
+    const user = await prisma.user.findUnique({
+      where: {
+        id: userId
+      },
+      select: {
+        email: true
+      }
+    });
+
+    const invite = await prisma.collaborationInvite.findFirst({
+      where: {
+        id: inviteId,
+        status: "PENDING",
+        OR: [
+          {
+            invitedUserId: userId
+          },
+          {
+            email: user?.email || ""
+          }
+        ]
+      }
+    });
+
+    if (!invite) {
+      return reply.status(404).send({
+        message: "Convite nao encontrado."
+      });
+    }
+
+    await prisma.$transaction([
+      prisma.collaborationMember.upsert({
+        where: {
+          groupId_userId: {
+            groupId: invite.groupId,
+            userId
+          }
+        },
+        create: {
+          groupId: invite.groupId,
+          userId,
+          role: "MEMBER"
+        },
+        update: {}
+      }),
+      prisma.collaborationInvite.update({
+        where: {
+          id: invite.id
+        },
+        data: {
+          invitedUserId: userId,
+          status: "ACCEPTED",
+          acceptedAt: new Date()
+        }
+      })
+    ]);
+
+    const group = await prisma.collaborationGroup.findUnique({
+      where: {
+        id: invite.groupId
+      },
+      include: groupInclude()
+    });
+
+    return {
+      group: group ? addProgressToGroup(group) : null
+    };
+  });
+
+  app.post("/invites/:inviteId/decline", async (request, reply) => {
+    const paramsSchema = z.object({
+      inviteId: z.string()
+    });
+
+    const userId = request.user.sub;
+    const { inviteId } = paramsSchema.parse(request.params);
+
+    const user = await prisma.user.findUnique({
+      where: {
+        id: userId
+      },
+      select: {
+        email: true
+      }
+    });
+
+    const invite = await prisma.collaborationInvite.findFirst({
+      where: {
+        id: inviteId,
+        status: "PENDING",
+        OR: [
+          {
+            invitedUserId: userId
+          },
+          {
+            email: user?.email || ""
+          }
+        ]
+      }
+    });
+
+    if (!invite) {
+      return reply.status(404).send({
+        message: "Convite nao encontrado."
+      });
+    }
+
+    const declinedInvite = await prisma.collaborationInvite.update({
+      where: {
+        id: invite.id
+      },
+      data: {
+        invitedUserId: userId,
+        status: "DECLINED"
+      },
+      include: {
+        group: {
+          include: groupInclude()
+        },
+        invitedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    return {
+      invite: decryptCollaborationInvite(declinedInvite)
+    };
+  });
+
+  app.post("/groups/:groupId/schedules", async (request, reply) => {
+    const paramsSchema = z.object({
+      groupId: z.string()
+    });
+
+    const userId = request.user.sub;
+    const { groupId } = paramsSchema.parse(request.params);
+    const data = scheduleBodySchema.parse(request.body);
+
+    const membership = await requireMembership(groupId, userId, reply);
+    if (!membership) return;
+
+    const schedule = await prisma.schedule.create({
+      data: encryptScheduleData({
+        userId,
+        groupId,
+        title: data.title,
+        description: data.description,
+        notes: data.notes,
+        linksJson: normalizeLinks(data.links),
+        extraInfo: data.extraInfo,
+        category: data.category || "OTHER",
+        sourceType: "MANUAL"
+      }),
+      include: {
+        reminders: {
+          include: {
+            logs: {
+              orderBy: {
+                createdAt: "desc"
+              }
+            },
+            assignedUser: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: {
+            startAt: "asc"
+          }
+        }
+      }
+    });
+
+    return reply.status(201).send({
+      schedule: withScheduleProgress(decryptSchedule(schedule))
+    });
+  });
+
+  app.post("/groups/:groupId/ai/suggest", async (request, reply) => {
+    const paramsSchema = z.object({
+      groupId: z.string()
+    });
+
+    const userId = request.user.sub;
+    const { groupId } = paramsSchema.parse(request.params);
+    const data = aiSuggestRequestSchema.parse(request.body);
+
+    const membership = await requireMembership(groupId, userId, reply);
+    if (!membership) return;
+
+    const group = await prisma.collaborationGroup.findUnique({
+      where: {
+        id: groupId
+      },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: {
+                name: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    const decryptedGroup = decryptCollaborationGroup(group);
+    const memberNames = (decryptedGroup?.members || [])
+      .map((member: any) => member.user?.name)
+      .filter(Boolean)
+      .join(", ");
+
+    const suggestion = await generateScheduleSuggestion({
+      ...data,
+      prompt: [
+        `Grupo colaborativo: ${decryptedGroup?.name || "sem nome"}.`,
+        memberNames ? `Participantes: ${memberNames}.` : "",
+        "Crie uma rotina em tarefas claras para o grupo concluir em conjunto.",
+        data.prompt
+      ].filter(Boolean).join("\n")
+    });
+
+    return reply.status(200).send({
+      suggestion: scheduleSuggestionSchema.parse(suggestion)
+    });
+  });
+
+  app.post("/groups/:groupId/schedules/from-suggestion", async (request, reply) => {
+    const paramsSchema = z.object({
+      groupId: z.string()
+    });
+
+    const bodySchema = z.object({
+      suggestion: scheduleSuggestionSchema
+    });
+
+    const userId = request.user.sub;
+    const { groupId } = paramsSchema.parse(request.params);
+    const { suggestion } = bodySchema.parse(request.body);
+
+    const membership = await requireMembership(groupId, userId, reply);
+    if (!membership) return;
+
+    const schedule = await prisma.schedule.create({
+      data: {
+        userId,
+        groupId,
+        ...encryptScheduleData({
+          title: suggestion.title,
+          description: suggestion.description || undefined,
+          notes: suggestion.notes || undefined,
+          linksJson: normalizeLinks(suggestion.links),
+          extraInfo: suggestion.extraInfo || undefined
+        }),
+        category: suggestion.category,
+        sourceType: "AI_PROMPT",
+        reminders: {
+          create: suggestion.reminders.map((reminder) =>
+            encryptReminderData({
+              title: reminder.title,
+              description: reminder.description || undefined,
+              notes: reminder.notes || undefined,
+              linksJson: normalizeLinks(reminder.links),
+              location: reminder.location || undefined,
+              priority: reminder.priority || "NORMAL",
+              startAt: buildStartAt(reminder.date, reminder.time),
+              timezone: reminder.timezone
+            })
+          )
+        }
+      },
+      include: {
+        reminders: {
+          include: {
+            logs: {
+              orderBy: {
+                createdAt: "desc"
+              }
+            },
+            assignedUser: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: {
+            startAt: "asc"
+          }
+        }
+      }
+    });
+
+    return reply.status(201).send({
+      schedule: withScheduleProgress(decryptSchedule(schedule))
+    });
+  });
+
+  app.patch("/reminders/:reminderId/assignee", async (request, reply) => {
+    const paramsSchema = z.object({
+      reminderId: z.string()
+    });
+
+    const userId = request.user.sub;
+    const { reminderId } = paramsSchema.parse(request.params);
+    const { assignedUserId } = assignReminderSchema.parse(request.body);
+
+    const reminder = await prisma.reminder.findUnique({
+      where: {
+        id: reminderId
+      },
+      include: {
+        schedule: true
+      }
+    });
+
+    if (!reminder?.schedule.groupId) {
+      return reply.status(404).send({
+        message: "Tarefa colaborativa nao encontrada."
+      });
+    }
+
+    const membership = await requireMembership(reminder.schedule.groupId, userId, reply);
+    if (!membership) return;
+
+    if (assignedUserId) {
+      const assignedMembership = await findMembership(reminder.schedule.groupId, assignedUserId);
+
+      if (!assignedMembership) {
+        return reply.status(400).send({
+          message: "Responsavel precisa fazer parte do grupo."
+        });
+      }
+    }
+
+    const updatedReminder = await prisma.reminder.update({
+      where: {
+        id: reminderId
+      },
+      data: {
+        assignedUserId
+      },
+      include: {
+        schedule: true,
+        logs: {
+          orderBy: {
+            createdAt: "desc"
+          }
+        },
+        assignedUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    return {
+      reminder: decryptSchedule({ reminders: [updatedReminder] }).reminders?.[0]
+    };
+  });
+}

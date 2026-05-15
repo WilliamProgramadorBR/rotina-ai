@@ -1,5 +1,6 @@
 import type { ScheduleSuggestion } from "./scheduleSuggestion.schema";
 import { scheduleSuggestionSchema } from "./scheduleSuggestion.schema";
+import { sanitizeAiPrompt, detectInjectionPatterns } from "../security/sanitizePrompt";
 
 type GenerateScheduleSuggestionInput = {
   prompt: string;
@@ -432,7 +433,14 @@ async function callOllama(prompt: string) {
 export async function generateScheduleSuggestionWithOllama(
   input: GenerateScheduleSuggestionInput
 ): Promise<ScheduleSuggestion> {
-  const firstResponse = await callOllama(buildPrompt(input));
+  const cleanPrompt = sanitizeAiPrompt(input.prompt);
+  const detectedPatterns = detectInjectionPatterns(cleanPrompt);
+  if (detectedPatterns.length > 0) {
+    console.warn("[OLLAMA] Possível prompt injection detectado", { patterns: detectedPatterns });
+  }
+  const sanitizedInput = { ...input, prompt: cleanPrompt };
+
+  const firstResponse = await callOllama(buildPrompt(sanitizedInput));
 
   try {
     const parsed = enrichMissingNotes(safeJsonParse(firstResponse));
@@ -440,7 +448,7 @@ export async function generateScheduleSuggestionWithOllama(
   } catch (firstError) {
     console.log("[OLLAMA] JSON inválido na primeira tentativa. Tentando reparar...");
 
-    const repairResponse = await callOllama(buildRepairPrompt(firstResponse, input));
+    const repairResponse = await callOllama(buildRepairPrompt(firstResponse, sanitizedInput));
 
     const repairedParsed = enrichMissingNotes(safeJsonParse(repairResponse));
     return scheduleSuggestionSchema.parse(repairedParsed);

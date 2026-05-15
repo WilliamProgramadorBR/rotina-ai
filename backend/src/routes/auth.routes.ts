@@ -22,7 +22,10 @@ export async function authRoutes(app: FastifyInstance) {
     const bodySchema = z.object({
       name: z.string().trim().min(2, "Nome obrigatorio."),
       email: z.string().trim().email("E-mail invalido.").toLowerCase(),
-      password: z.string().min(8, "Senha deve ter no minimo 8 caracteres.")
+      password: z.string().min(8, "Senha deve ter no minimo 8 caracteres."),
+      acceptedPrivacy: z.boolean().refine((value) => value === true, {
+        message: "Voce precisa aceitar os termos de privacidade para criar a conta."
+      })
     });
 
     const { name, email, password } = bodySchema.parse(request.body);
@@ -43,7 +46,8 @@ export async function authRoutes(app: FastifyInstance) {
       data: {
         name,
         email,
-        passwordHash
+        passwordHash,
+        acceptedPrivacyAt: new Date()
       },
       select: {
         id: true,

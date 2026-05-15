@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Linking,
@@ -9,6 +9,7 @@ import {
   TextInput,
   View
 } from "react-native";
+import ViewShot from "react-native-view-shot";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { api } from "../../src/services/api";
 import { Reminder, Schedule } from "../../src/types/entities";
@@ -31,6 +32,8 @@ import { useThemeMode } from "../../src/context/ThemeContext";
 import { IconSymbol } from "../../src/components/IconSymbol";
 import { useResponsive } from "../../src/hooks/useResponsive";
 import { updateReminderOfflineSafeRequest } from "../../src/services/reminders";
+import { captureAndShare } from "../../src/services/shareRoutine";
+import { ShareScheduleCard } from "../../src/components/ShareScheduleCard";
 
 type Linkable = {
   links?: string[] | null;
@@ -186,7 +189,7 @@ function LinkChips({ links, compact = false }: { links: string[]; compact?: bool
 
 export default function ScheduleDetailScreen() {
   const { theme, isDark } = useThemeMode();
-  const { width, isPhone, isSmallPhone, isTablet, isDesktop, gap } = useResponsive();
+  const { width, isPhone, isSmallPhone, isPhoneLarge, isTablet, isDesktop, gap } = useResponsive();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -194,8 +197,10 @@ export default function ScheduleDetailScreen() {
   const [noteDraft, setNoteDraft] = useState("");
   const [linksDraft, setLinksDraft] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const shareCardRef = useRef<any>(null);
 
-  const isCompact = isPhone || isSmallPhone;
+  const isCompact = isPhone || isSmallPhone || isPhoneLarge;
   const isTwoColumn = isDesktop;
 
   const loadSchedule = useCallback(async () => {
@@ -230,6 +235,17 @@ export default function ScheduleDetailScreen() {
       }))
       .filter((group) => group.data.length > 0);
   }, [reminders]);
+
+  async function handleShare() {
+    try {
+      setIsSharing(true);
+      await captureAndShare(shareCardRef as any, "rotina-ai-cronograma.png");
+    } catch (error: any) {
+      Alert.alert("Não foi possível compartilhar", error?.message || "Tente novamente.");
+    } finally {
+      setIsSharing(false);
+    }
+  }
 
   async function deleteSchedule() {
     if (!schedule) return;
@@ -381,6 +397,14 @@ export default function ScheduleDetailScreen() {
                       title="Novo lembrete"
                       icon="plus"
                       onPress={() => router.push({ pathname: "/reminders/new", params: { scheduleId: schedule.id } })}
+                      style={[styles.actionButton, isCompact && styles.actionButtonCompact]}
+                    />
+                    <Button
+                      title={isSharing ? "Gerando..." : "Compartilhar"}
+                      icon="share-variant-outline"
+                      variant="secondary"
+                      onPress={handleShare}
+                      loading={isSharing}
                       style={[styles.actionButton, isCompact && styles.actionButtonCompact]}
                     />
                     <Button
@@ -572,6 +596,19 @@ export default function ScheduleDetailScreen() {
             </View>
           )}
 
+          {/* Card off-screen para captura e compartilhamento */}
+          <View style={styles.offscreen}>
+            <ViewShot ref={shareCardRef} options={{ format: "png", quality: 1 }}>
+              <ShareScheduleCard
+                scheduleTitle={schedule?.title || ""}
+                scheduleDescription={schedule?.description}
+                category={schedule?.category || "OTHER"}
+                reminders={reminders}
+                completionRate={schedule?.progress?.completionRate ?? 0}
+              />
+            </ViewShot>
+          </View>
+
           <Modal
             visible={Boolean(editingReminder)}
             transparent
@@ -641,6 +678,11 @@ const styles = StyleSheet.create({
   page: {
     width: "100%",
     minWidth: 0
+  },
+  offscreen: {
+    position: "absolute",
+    left: -9999,
+    top: 0
   },
   backButton: {
     minHeight: 42,

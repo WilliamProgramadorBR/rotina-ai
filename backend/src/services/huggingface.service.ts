@@ -2,6 +2,7 @@ import {
   ScheduleSuggestion,
   scheduleSuggestionSchema
 } from "./scheduleSuggestion.schema";
+import { sanitizeAiPrompt, detectInjectionPatterns } from "../security/sanitizePrompt";
 
 type GenerateScheduleSuggestionInput = {
   prompt: string;
@@ -431,7 +432,12 @@ async function callHuggingFace(systemInstruction: string, userPrompt: string) {
 export async function generateScheduleSuggestionWithHuggingFace(
   params: GenerateScheduleSuggestionInput
 ): Promise<ScheduleSuggestion> {
-  const input = normalizeInput(params);
+  const cleanPrompt = sanitizeAiPrompt(params.prompt);
+  const detectedPatterns = detectInjectionPatterns(cleanPrompt);
+  if (detectedPatterns.length > 0) {
+    console.warn("[HUGGINGFACE] Possível prompt injection detectado", { patterns: detectedPatterns });
+  }
+  const input = normalizeInput({ ...params, prompt: cleanPrompt });
   const systemInstruction = buildSystemInstruction(input);
   const userPrompt = buildUserPrompt(input);
   const firstResponse = await callHuggingFace(systemInstruction, userPrompt);

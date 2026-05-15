@@ -47,6 +47,7 @@ pnpm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+.claude/
 
 # TypeScript / cache
 *.tsbuildinfo

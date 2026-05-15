@@ -3,5 +3,12 @@
 ../.claude
 ../node_modules
 .git
+.expo
+android
+ios
+builds
+.gradle
+.gradle-*
+node_modules/.cache
 dist
 dist-build-check

@@ -20,9 +20,9 @@ export function PageHeader({
   right,
   searchPlaceholder
 }: PageHeaderProps) {
-  const { width, isPhone, isSmallPhone } = useResponsive();
+  const { width, isPhone, isSmallPhone, isPhoneLarge } = useResponsive();
   const { theme } = useThemeMode();
-  const isMobile = isPhone || isSmallPhone;
+  const isMobile = isPhone || isSmallPhone || isPhoneLarge;
 
   return (
     <View style={styles.container}>

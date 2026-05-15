@@ -28,6 +28,7 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isMobileLayout = isPhone || isPhoneLarge;
@@ -42,10 +43,14 @@ export default function RegisterScreen() {
         Alert.alert("Atencao", "As senhas nao conferem.");
         return;
       }
+      if (!acceptedPrivacy) {
+        Alert.alert("Privacidade", "Leia e aceite os termos de privacidade para criar sua conta.");
+        return;
+      }
 
       setIsSubmitting(true);
       if (typeof signUp === "function") {
-        await signUp(name.trim(), email.trim().toLowerCase(), password);
+        await signUp(name.trim(), email.trim().toLowerCase(), password, acceptedPrivacy);
       }
       router.replace("/onboarding");
     } catch (error: any) {
@@ -220,11 +225,39 @@ export default function RegisterScreen() {
               isDark={isDark}
             />
 
+            <Pressable
+              style={styles.termsRow}
+              onPress={() => setAcceptedPrivacy((value) => !value)}
+            >
+              <View style={[
+                styles.checkbox,
+                {
+                  backgroundColor: acceptedPrivacy ? theme.primary : "transparent",
+                  borderColor: acceptedPrivacy ? theme.primary : theme.borderStrong
+                }
+              ]}>
+                {acceptedPrivacy ? <IconSymbol name="check" size={15} color="#fff" /> : null}
+              </View>
+              <Text style={[styles.termsText, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>
+                Li e aceito a Politica de Privacidade e os Termos de Uso.{" "}
+                <Text
+                  style={{ color: theme.primary, fontFamily: fonts.bold }}
+                  onPress={() => router.push("/privacy")}
+                >
+                  Ver termos
+                </Text>
+              </Text>
+            </Pressable>
+
             {/* Submit Button */}
             <Pressable
-              style={[styles.primaryButton, isMobileLayout && styles.primaryButtonMobile]}
+              style={[
+                styles.primaryButton,
+                isMobileLayout && styles.primaryButtonMobile,
+                (!acceptedPrivacy || isSubmitting) && { opacity: 0.62 }
+              ]}
               onPress={handleRegister}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !acceptedPrivacy}
             >
               {isSubmitting ? (
                 <ActivityIndicator color="#fff" />
@@ -547,6 +580,29 @@ const styles = StyleSheet.create({
   showButton: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm
+  },
+
+  termsRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    marginBottom: spacing.lg
+  },
+
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1
+  },
+
+  termsText: {
+    flex: 1,
+    fontFamily: fonts.regular,
+    lineHeight: 18
   },
 
   showText: {

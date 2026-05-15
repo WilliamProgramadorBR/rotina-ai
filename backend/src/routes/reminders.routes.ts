@@ -78,6 +78,25 @@ function hasField<T extends object>(data: T, field: keyof T) {
   return Object.prototype.hasOwnProperty.call(data, field);
 }
 
+function accessibleScheduleWhere(userId: string) {
+  return {
+    OR: [
+      {
+        userId
+      },
+      {
+        group: {
+          members: {
+            some: {
+              userId
+            }
+          }
+        }
+      }
+    ]
+  };
+}
+
 export async function remindersRoutes(app: FastifyInstance) {
   app.addHook("preHandler", app.authenticate);
 
@@ -96,7 +115,7 @@ export async function remindersRoutes(app: FastifyInstance) {
     const reminders = await prisma.reminder.findMany({
       where: {
         schedule: {
-          userId
+          ...accessibleScheduleWhere(userId)
         },
         startAt: {
           gte: startDate,
@@ -135,7 +154,7 @@ export async function remindersRoutes(app: FastifyInstance) {
     const reminders = await prisma.reminder.findMany({
       where: {
         schedule: {
-          userId
+          ...accessibleScheduleWhere(userId)
         },
         status: "ACTIVE",
         startAt: {
@@ -173,19 +192,19 @@ export async function remindersRoutes(app: FastifyInstance) {
   app.post("/", async (request, reply) => {
     const bodySchema = z.object({
       scheduleId: z.string(),
-      title: z.string().min(2),
-      description: z.string().optional(),
+      title: z.string().min(2).max(80),
+      description: z.string().max(300).optional(),
 
-      notes: z.string().optional(),
-      links: z.array(z.string()).optional(),
-      location: z.string().optional(),
+      notes: z.string().max(500).optional(),
+      links: z.array(z.string().max(500)).max(20).optional(),
+      location: z.string().max(200).optional(),
       priority: reminderPrioritySchema.optional(),
       alarmLevel: alarmLevelSchema.optional(),
 
       startAt: z.string().datetime(),
       endAt: z.string().datetime().optional(),
-      recurrenceRule: z.string().optional(),
-      timezone: z.string().default("America/Sao_Paulo")
+      recurrenceRule: z.string().max(200).optional(),
+      timezone: z.string().max(60).default("America/Sao_Paulo")
     });
 
     const userId = request.user.sub;
@@ -194,7 +213,7 @@ export async function remindersRoutes(app: FastifyInstance) {
     const schedule = await prisma.schedule.findFirst({
       where: {
         id: data.scheduleId,
-        userId
+        ...accessibleScheduleWhere(userId)
       }
     });
 
@@ -242,17 +261,17 @@ export async function remindersRoutes(app: FastifyInstance) {
     });
 
     const bodySchema = z.object({
-      title: z.string().min(2).optional(),
-      description: z.string().nullable().optional(),
-      notes: z.string().nullable().optional(),
-      links: z.array(z.string()).nullable().optional(),
-      location: z.string().nullable().optional(),
+      title: z.string().min(2).max(80).optional(),
+      description: z.string().max(300).nullable().optional(),
+      notes: z.string().max(500).nullable().optional(),
+      links: z.array(z.string().max(500)).max(20).nullable().optional(),
+      location: z.string().max(200).nullable().optional(),
       priority: reminderPrioritySchema.nullable().optional(),
       alarmLevel: alarmLevelSchema.optional(),
       startAt: z.string().datetime().optional(),
       endAt: z.string().datetime().nullable().optional(),
-      recurrenceRule: z.string().nullable().optional(),
-      timezone: z.string().optional()
+      recurrenceRule: z.string().max(200).nullable().optional(),
+      timezone: z.string().max(60).optional()
     }).refine((data) => Object.keys(data).length > 0, {
       message: "Informe ao menos um campo para atualizar."
     });
@@ -265,7 +284,7 @@ export async function remindersRoutes(app: FastifyInstance) {
       where: {
         id,
         schedule: {
-          userId
+          ...accessibleScheduleWhere(userId)
         }
       }
     });
@@ -317,7 +336,7 @@ export async function remindersRoutes(app: FastifyInstance) {
 
     const bodySchema = z.object({
       action: reminderActionSchema,
-      note: z.string().optional()
+      note: z.string().max(500).optional()
     });
 
     const { id } = paramsSchema.parse(request.params);
@@ -328,7 +347,7 @@ export async function remindersRoutes(app: FastifyInstance) {
       where: {
         id,
         schedule: {
-          userId
+          ...accessibleScheduleWhere(userId)
         }
       }
     });
@@ -370,7 +389,7 @@ export async function remindersRoutes(app: FastifyInstance) {
       where: {
         id,
         schedule: {
-          userId
+          ...accessibleScheduleWhere(userId)
         }
       }
     });

@@ -36,7 +36,7 @@ type AuthContextData = {
   isLoading: boolean;
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (name: string, email: string, password: string) => Promise<void>;
+  signUp: (name: string, email: string, password: string, acceptedPrivacy?: boolean) => Promise<void>;
   signOut: () => Promise<void>;
   reloadUser: () => Promise<void>;
 };
@@ -183,7 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signUp = useCallback(
-    async (name: string, email: string, password: string) => {
+    async (name: string, email: string, password: string, acceptedPrivacy = false) => {
       setAuthToken(null);
       setTokenState(null);
       setUser(null);
@@ -191,7 +191,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await postPublic<AuthResponse>("/auth/register", {
         name,
         email,
-        password
+        password,
+        acceptedPrivacy
       });
 
       debugAuthLog("[REGISTER RESPONSE]", {

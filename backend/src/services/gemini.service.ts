@@ -2,6 +2,7 @@ import {
   ScheduleSuggestion,
   scheduleSuggestionSchema
 } from "./scheduleSuggestion.schema";
+import { sanitizeAiPrompt, detectInjectionPatterns } from "../security/sanitizePrompt";
 
 function getTodayInSaoPaulo() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -49,6 +50,12 @@ export async function generateScheduleSuggestionWithGemini(params: {
 
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY não configurada.");
+  }
+
+  const cleanPrompt = sanitizeAiPrompt(params.prompt);
+  const detectedPatterns = detectInjectionPatterns(cleanPrompt);
+  if (detectedPatterns.length > 0) {
+    console.warn("[GEMINI] Possível prompt injection detectado", { patterns: detectedPatterns });
   }
 
   const systemInstruction = `
@@ -107,7 +114,7 @@ Formato obrigatório:
 
   const userPrompt = `
 Pedido do usuário:
-${params.prompt}
+${cleanPrompt}
 
 Data inicial preferencial: ${today}
 Timezone: ${timezone}

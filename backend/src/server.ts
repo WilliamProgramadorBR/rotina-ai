@@ -10,6 +10,7 @@ import { remindersRoutes } from "./routes/reminders.routes";
 import { iaRoutes } from "./routes/ia.routes";
 import { metricsRoutes } from "./routes/metrics.routes";
 import { alarmLogsRoutes } from "./routes/alarm-logs.routes";
+import { collaborationRoutes } from "./routes/collaboration.routes";
 import {
   isCorsOriginAllowed,
   isUsingJwtSecretForDataEncryption,
@@ -126,6 +127,10 @@ app.register(metricsRoutes, {
 
 app.register(alarmLogsRoutes, {
   prefix: "/alarm-logs"
+});
+
+app.register(collaborationRoutes, {
+  prefix: "/collaboration"
 });
 
 app.listen({ port: PORT, host: "0.0.0.0" }).then(() => {

@@ -13,6 +13,8 @@ const reminderFields = [
 ] as const;
 const reminderLogFields = ["note"] as const;
 const aiRequestFields = ["prompt", "imageUrl", "aiResponseJson"] as const;
+const collaborationGroupFields = ["name", "description"] as const;
+const collaborationInviteFields = ["message"] as const;
 
 function transformFields<T extends AnyRecord | null | undefined>(
   record: T,
@@ -48,6 +50,14 @@ export function encryptReminderLogData<T extends AnyRecord>(data: T): T {
 
 export function encryptAiRequestData<T extends AnyRecord>(data: T): T {
   return transformFields(data, aiRequestFields, encryptText);
+}
+
+export function encryptCollaborationGroupData<T extends AnyRecord>(data: T): T {
+  return transformFields(data, collaborationGroupFields, encryptText);
+}
+
+export function encryptCollaborationInviteData<T extends AnyRecord>(data: T): T {
+  return transformFields(data, collaborationInviteFields, encryptText);
 }
 
 export function decryptReminderLog<T extends AnyRecord | null | undefined>(log: T): T {
@@ -94,7 +104,54 @@ export function decryptReminders<T extends AnyRecord>(reminders: T[]) {
   return reminders.map(decryptReminder);
 }
 
+export function decryptCollaborationInvite<T extends AnyRecord | null | undefined>(invite: T): T {
+  const decrypted = transformFields(invite, collaborationInviteFields, decryptText);
+
+  if (!decrypted) {
+    return decrypted;
+  }
+
+  if (decrypted.group) {
+    decrypted.group = decryptCollaborationGroup(decrypted.group);
+  }
+
+  return decrypted;
+}
+
+export function decryptCollaborationGroup<T extends AnyRecord | null | undefined>(group: T): T {
+  const decrypted = transformFields(group, collaborationGroupFields, decryptText);
+
+  if (!decrypted) {
+    return decrypted;
+  }
+
+  if (Array.isArray(decrypted.schedules)) {
+    decrypted.schedules = decryptSchedules(decrypted.schedules);
+  }
+
+  if (Array.isArray(decrypted.invites)) {
+    decrypted.invites = decrypted.invites.map(decryptCollaborationInvite);
+  }
+
+  return decrypted;
+}
+
+export function decryptCollaborationGroups<T extends AnyRecord>(groups: T[]) {
+  return groups.map(decryptCollaborationGroup);
+}
+
+export function decryptCollaborationInvites<T extends AnyRecord>(invites: T[]) {
+  return invites.map(decryptCollaborationInvite);
+}
+
 export function hasEncryptedPrivateFields(record: AnyRecord) {
-  return [...scheduleFields, ...reminderFields, ...reminderLogFields, ...aiRequestFields]
+  return [
+    ...scheduleFields,
+    ...reminderFields,
+    ...reminderLogFields,
+    ...aiRequestFields,
+    ...collaborationGroupFields,
+    ...collaborationInviteFields
+  ]
     .some((field) => isEncryptedValue(record[field]));
 }

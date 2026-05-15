@@ -38,6 +38,7 @@ const menuItems: Array<{ label: string; icon: IconSymbolName; route: string; gro
   { label: "Dashboard", icon: "chart-box-outline", route: "/dashboard", group: "principal" },
   { label: "Revisao Semanal", icon: "chart-timeline-variant", route: "/weekly-review", group: "principal" },
   { label: "Cronogramas", icon: "format-list-checks", route: "/schedules", group: "rotinas" },
+  { label: "Colaboracao", icon: "account-group-outline", route: "/collaboration", group: "rotinas" },
   { label: "Criar com IA", icon: "auto-fix", route: "/ai-prompt", group: "rotinas" },
   { label: "Templates", icon: "format-list-bulleted", route: "/templates", group: "rotinas" },
   { label: "Modo Foco", icon: "timer-outline", route: "/foco", group: "ferramentas" },

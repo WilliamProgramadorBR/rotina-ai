@@ -4,6 +4,7 @@ type RateLimitOptions = {
   scope: string;
   max: number;
   windowMs: number;
+  keyFn?: (request: FastifyRequest) => string;
 };
 
 type RateBucket = {
@@ -13,7 +14,7 @@ type RateBucket = {
 
 const buckets = new Map<string, RateBucket>();
 
-function getClientIp(request: FastifyRequest) {
+export function getClientIp(request: FastifyRequest) {
   const forwardedFor = request.headers["x-forwarded-for"];
 
   if (typeof forwardedFor === "string" && forwardedFor.trim()) {
@@ -30,7 +31,8 @@ function getClientIp(request: FastifyRequest) {
 export function createRateLimitPreHandler(options: RateLimitOptions) {
   return async function rateLimitPreHandler(request: FastifyRequest, reply: FastifyReply) {
     const now = Date.now();
-    const key = `${options.scope}:${getClientIp(request)}`;
+    const keyPart = options.keyFn ? options.keyFn(request) : getClientIp(request);
+    const key = `${options.scope}:${keyPart}`;
     const current = buckets.get(key);
 
     if (!current || current.resetAt <= now) {

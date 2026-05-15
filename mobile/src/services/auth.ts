@@ -15,11 +15,12 @@ export async function loginRequest(email: string, password: string) {
   return data;
 }
 
-export async function registerRequest(name: string, email: string, password: string) {
+export async function registerRequest(name: string, email: string, password: string, acceptedPrivacy = false) {
   const { data } = await api.post<AuthResponse>("/auth/register", {
     name,
     email,
     password,
+    acceptedPrivacy,
   });
 
   return data;

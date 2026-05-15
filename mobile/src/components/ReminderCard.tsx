@@ -55,7 +55,7 @@ function formatTime(value: string) {
 }
 
 export function ReminderCard({ reminder, onDone, onSnooze, onSkip, onReplan }: ReminderCardProps) {
-  const { width, isPhone, isSmallPhone } = useResponsive();
+  const { width, isPhone, isSmallPhone, isPhoneLarge } = useResponsive();
   const { theme, isDark } = useThemeMode();
   const category = getCategoryMeta(reminder.schedule?.category);
   const priority = getPriorityMeta(reminder.priority || "NORMAL");
@@ -65,7 +65,7 @@ export function ReminderCard({ reminder, onDone, onSnooze, onSkip, onReplan }: R
   const overdue = isReminderOverdue(reminder);
   const overdueLabel = formatOverdueLabel(reminder.startAt);
 
-  const isMobile = isPhone || isSmallPhone;
+  const isMobile = isPhone || isSmallPhone || isPhoneLarge;
 
   return (
     <View
