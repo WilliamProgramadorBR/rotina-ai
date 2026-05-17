@@ -12,6 +12,7 @@ const reminderFields = [
   "recurrenceRule"
 ] as const;
 const reminderLogFields = ["note"] as const;
+const reminderCommentFields = ["message"] as const;
 const aiRequestFields = ["prompt", "imageUrl", "aiResponseJson"] as const;
 const collaborationGroupFields = ["name", "description"] as const;
 const collaborationInviteFields = ["message"] as const;
@@ -48,6 +49,10 @@ export function encryptReminderLogData<T extends AnyRecord>(data: T): T {
   return transformFields(data, reminderLogFields, encryptText);
 }
 
+export function encryptReminderCommentData<T extends AnyRecord>(data: T): T {
+  return transformFields(data, reminderCommentFields, encryptText);
+}
+
 export function encryptAiRequestData<T extends AnyRecord>(data: T): T {
   return transformFields(data, aiRequestFields, encryptText);
 }
@@ -64,6 +69,10 @@ export function decryptReminderLog<T extends AnyRecord | null | undefined>(log: 
   return transformFields(log, reminderLogFields, decryptText);
 }
 
+export function decryptReminderComment<T extends AnyRecord | null | undefined>(comment: T): T {
+  return transformFields(comment, reminderCommentFields, decryptText);
+}
+
 export function decryptReminder<T extends AnyRecord | null | undefined>(reminder: T): T {
   const decrypted = transformFields(reminder, reminderFields, decryptText);
 
@@ -73,6 +82,10 @@ export function decryptReminder<T extends AnyRecord | null | undefined>(reminder
 
   if (Array.isArray(decrypted.logs)) {
     decrypted.logs = decrypted.logs.map(decryptReminderLog);
+  }
+
+  if (Array.isArray(decrypted.comments)) {
+    decrypted.comments = decrypted.comments.map(decryptReminderComment);
   }
 
   if (decrypted.schedule) {
@@ -149,6 +162,7 @@ export function hasEncryptedPrivateFields(record: AnyRecord) {
     ...scheduleFields,
     ...reminderFields,
     ...reminderLogFields,
+    ...reminderCommentFields,
     ...aiRequestFields,
     ...collaborationGroupFields,
     ...collaborationInviteFields

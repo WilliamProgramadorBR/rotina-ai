@@ -12,7 +12,7 @@ import {
 import ViewShot from "react-native-view-shot";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { api } from "../../src/services/api";
-import { Reminder, Schedule } from "../../src/types/entities";
+import { Reminder, ReminderComment, Schedule } from "../../src/types/entities";
 import {
   colors,
   fonts,
@@ -31,6 +31,7 @@ import { ScreenLayout } from "../../src/components/ScreenLayout";
 import { useThemeMode } from "../../src/context/ThemeContext";
 import { IconSymbol } from "../../src/components/IconSymbol";
 import { useResponsive } from "../../src/hooks/useResponsive";
+import { createCollaborationReminderCommentRequest } from "../../src/services/collaboration";
 import { updateReminderOfflineSafeRequest } from "../../src/services/reminders";
 import { captureAndShare } from "../../src/services/shareRoutine";
 import { ShareScheduleCard } from "../../src/components/ShareScheduleCard";
@@ -97,6 +98,26 @@ function getPeriodLabel(value: string) {
   if (hour < 12) return "Manha";
   if (hour < 18) return "Tarde";
   return "Noite";
+}
+
+function formatDateTime(value?: string | Date | null) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function getCompletionLog(reminder: Reminder) {
+  return [...(reminder.logs || [])]
+    .filter((log) => log.action === "DONE")
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] || null;
 }
 
 function getAlarmLevelMeta(level?: string | null) {
@@ -194,9 +215,12 @@ export default function ScheduleDetailScreen() {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
+  const [commentingReminder, setCommentingReminder] = useState<Reminder | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [linksDraft, setLinksDraft] = useState("");
+  const [commentDraft, setCommentDraft] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
+  const [isSavingComment, setIsSavingComment] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const shareCardRef = useRef<any>(null);
 
@@ -280,6 +304,17 @@ export default function ScheduleDetailScreen() {
     setLinksDraft("");
   }
 
+  function openReminderComment(reminder: Reminder) {
+    setCommentingReminder(reminder);
+    setCommentDraft("");
+  }
+
+  function closeReminderComment(force = false) {
+    if (isSavingComment && !force) return;
+    setCommentingReminder(null);
+    setCommentDraft("");
+  }
+
   async function saveReminderNotes() {
     if (!editingReminder) return;
 
@@ -316,6 +351,46 @@ export default function ScheduleDetailScreen() {
       Alert.alert("Erro", error?.response?.data?.message || "Nao foi possivel salvar a observacao.");
     } finally {
       setIsSavingNote(false);
+    }
+  }
+
+  async function saveReminderComment() {
+    if (!commentingReminder) return;
+
+    if (commentDraft.trim().length === 0) {
+      Alert.alert("Comentario", "Escreva um comentario para registrar na tarefa.");
+      return;
+    }
+
+    try {
+      setIsSavingComment(true);
+      const comment = await createCollaborationReminderCommentRequest(commentingReminder.id, {
+        message: commentDraft.trim()
+      });
+
+      setSchedule((current) => {
+        if (!current) return current;
+
+        return {
+          ...current,
+          reminders: (current.reminders || []).map((reminder) => {
+            if (reminder.id !== commentingReminder.id) {
+              return reminder;
+            }
+
+            return {
+              ...reminder,
+              comments: [comment, ...(reminder.comments || [])]
+            };
+          })
+        };
+      });
+
+      closeReminderComment(true);
+    } catch (error: any) {
+      Alert.alert("Erro", error?.response?.data?.message || "Nao foi possivel comentar nesta tarefa.");
+    } finally {
+      setIsSavingComment(false);
     }
   }
 
@@ -458,6 +533,8 @@ export default function ScheduleDetailScreen() {
                             const reminderLinks = parseLinks(reminder);
                             const priority = getPriorityMeta(reminder.priority || "NORMAL");
                             const alarm = getAlarmLevelMeta(reminder.alarmLevel);
+                            const completionLog = getCompletionLog(reminder);
+                            const comments = reminder.comments || [];
 
                             return (
                               <View
@@ -493,21 +570,39 @@ export default function ScheduleDetailScreen() {
                                       ) : null}
                                     </View>
 
-                                    <Pressable
-                                      onPress={() => openReminderNotes(reminder)}
-                                      style={({ pressed }) => [
-                                        styles.editButton,
-                                        { backgroundColor: theme.surfaceMuted, borderColor: theme.border },
-                                        pressed && styles.pressed
-                                      ]}
-                                    >
-                                      <IconSymbol name={reminder.notes ? "pencil" : "note-plus-outline"} size={16} color={theme.primary} />
-                                      {!isSmallPhone ? (
-                                        <Text style={[styles.editButtonText, { color: theme.primary }]}>
-                                          {reminder.notes ? "Editar obs." : "Add obs."}
-                                        </Text>
+                                    <View style={styles.reminderQuickActions}>
+                                      <Pressable
+                                        onPress={() => openReminderNotes(reminder)}
+                                        style={({ pressed }) => [
+                                          styles.editButton,
+                                          { backgroundColor: theme.surfaceMuted, borderColor: theme.border },
+                                          pressed && styles.pressed
+                                        ]}
+                                      >
+                                        <IconSymbol name={reminder.notes ? "pencil" : "note-plus-outline"} size={16} color={theme.primary} />
+                                        {!isSmallPhone ? (
+                                          <Text style={[styles.editButtonText, { color: theme.primary }]}>
+                                            {reminder.notes ? "Editar obs." : "Add obs."}
+                                          </Text>
+                                        ) : null}
+                                      </Pressable>
+
+                                      {schedule.groupId ? (
+                                        <Pressable
+                                          onPress={() => openReminderComment(reminder)}
+                                          style={({ pressed }) => [
+                                            styles.editButton,
+                                            { backgroundColor: theme.primarySoft, borderColor: theme.focusRing },
+                                            pressed && styles.pressed
+                                          ]}
+                                        >
+                                          <IconSymbol name="comment-plus-outline" size={16} color={theme.primary} />
+                                          {!isSmallPhone ? (
+                                            <Text style={[styles.editButtonText, { color: theme.primary }]}>Comentar</Text>
+                                          ) : null}
+                                        </Pressable>
                                       ) : null}
-                                    </Pressable>
+                                    </View>
                                   </View>
 
                                   <View style={styles.badgeRow}>
@@ -534,7 +629,45 @@ export default function ScheduleDetailScreen() {
                                     </View>
                                   ) : null}
 
+                                  {completionLog ? (
+                                    <View style={[styles.activityBox, { backgroundColor: theme.successSoft, borderColor: "#BBF7D0" }]}>
+                                      <IconSymbol name="check-circle-outline" size={16} color={theme.success} />
+                                      <View style={styles.activityTextBox}>
+                                        <Text style={[styles.activityTitle, { color: theme.success }]}>
+                                          Concluida por {completionLog.user?.name || "um membro"} em {formatDateTime(completionLog.createdAt)}
+                                        </Text>
+                                        {completionLog.note ? (
+                                          <Text style={[styles.activityText, { color: theme.textMuted }]}>{completionLog.note}</Text>
+                                        ) : null}
+                                      </View>
+                                    </View>
+                                  ) : null}
+
                                   <LinkChips links={reminderLinks} compact={isCompact} />
+
+                                  {comments.length > 0 ? (
+                                    <View style={[styles.commentsBox, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
+                                      <View style={styles.commentsHeader}>
+                                        <IconSymbol name="comment-text-outline" size={16} color={theme.textMuted} />
+                                        <Text style={[styles.commentsTitle, { color: theme.text }]}>
+                                          Comentarios
+                                        </Text>
+                                      </View>
+                                      {comments.slice(0, 3).map((comment: ReminderComment) => (
+                                        <View key={comment.id} style={styles.commentItem}>
+                                          <Text style={[styles.commentMeta, { color: theme.textMuted }]}>
+                                            {comment.user?.name || "Membro"} - {formatDateTime(comment.createdAt)}
+                                          </Text>
+                                          <Text style={[styles.commentMessage, { color: theme.text }]}>{comment.message}</Text>
+                                        </View>
+                                      ))}
+                                      {comments.length > 3 ? (
+                                        <Text style={[styles.commentMeta, { color: theme.textMuted }]}>
+                                          + {comments.length - 3} comentario{comments.length - 3 === 1 ? "" : "s"} anterior{comments.length - 3 === 1 ? "" : "es"}
+                                        </Text>
+                                      ) : null}
+                                    </View>
+                                  ) : null}
 
                                   {overdue ? (
                                     <Text style={styles.overdueText}>{formatOverdueLabel(reminder.startAt)}</Text>
@@ -664,6 +797,50 @@ export default function ScheduleDetailScreen() {
                 <View style={styles.modalActions}>
                   <Button title="Cancelar" variant="secondary" onPress={closeReminderNotes} style={styles.modalActionButton} />
                   <Button title="Salvar" onPress={saveReminderNotes} loading={isSavingNote} style={styles.modalActionButton} />
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal
+            visible={Boolean(commentingReminder)}
+            transparent
+            animationType="fade"
+            onRequestClose={() => closeReminderComment()}
+          >
+            <View style={styles.modalRoot}>
+              <Pressable style={styles.modalBackdrop} onPress={() => closeReminderComment()} />
+              <View style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalTitleBox}>
+                    <Text style={[styles.modalTitle, { color: theme.text }]}>Comentario da tarefa</Text>
+                    <Text style={[styles.modalSubtitle, { color: theme.textMuted }]} numberOfLines={1}>
+                      {commentingReminder?.title || "Tarefa"}
+                    </Text>
+                  </View>
+                  <Pressable onPress={() => closeReminderComment()} style={[styles.modalClose, { backgroundColor: theme.surfaceMuted }]}>
+                    <IconSymbol name="close" size={20} color={theme.textMuted} />
+                  </Pressable>
+                </View>
+
+                <Text style={[styles.inputLabel, { color: theme.text }]}>Comentario</Text>
+                <TextInput
+                  value={commentDraft}
+                  onChangeText={setCommentDraft}
+                  placeholder="Registre andamento, combinados ou bloqueios desta tarefa."
+                  placeholderTextColor={theme.textSoft}
+                  multiline
+                  textAlignVertical="top"
+                  style={[
+                    styles.modalInput,
+                    styles.modalInputMultiline,
+                    { color: theme.text, backgroundColor: theme.surfaceMuted, borderColor: theme.border }
+                  ]}
+                />
+
+                <View style={styles.modalActions}>
+                  <Button title="Cancelar" variant="secondary" onPress={closeReminderComment} style={styles.modalActionButton} />
+                  <Button title="Comentar" onPress={saveReminderComment} loading={isSavingComment} style={styles.modalActionButton} />
                 </View>
               </View>
             </View>
@@ -923,6 +1100,13 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: spacing.xs
   },
+  reminderQuickActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    gap: spacing.sm,
+    maxWidth: 260
+  },
   editButton: {
     minHeight: 36,
     borderRadius: radius.md,
@@ -968,6 +1152,54 @@ const styles = StyleSheet.create({
   },
   noteText: {
     flex: 1,
+    fontFamily: fonts.regular,
+    lineHeight: 19
+  },
+  activityBox: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: spacing.md,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    marginTop: spacing.md
+  },
+  activityTextBox: {
+    flex: 1,
+    minWidth: 0
+  },
+  activityTitle: {
+    fontFamily: fonts.bold,
+    lineHeight: 18
+  },
+  activityText: {
+    fontFamily: fonts.regular,
+    lineHeight: 18,
+    marginTop: 2
+  },
+  commentsBox: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: spacing.md,
+    gap: spacing.sm,
+    marginTop: spacing.md
+  },
+  commentsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs
+  },
+  commentsTitle: {
+    fontFamily: fonts.bold
+  },
+  commentItem: {
+    gap: 2
+  },
+  commentMeta: {
+    fontFamily: fonts.medium,
+    fontSize: 11
+  },
+  commentMessage: {
     fontFamily: fonts.regular,
     lineHeight: 19
   },

@@ -104,12 +104,21 @@ export default function CollaborationScreen() {
             subtitle="Crie rotinas com outras pessoas e acompanhe tarefas do grupo"
             onMenu={isWide ? undefined : openMenu}
             right={
-              <Button
-                title={isMobile ? "Novo" : "Novo grupo"}
-                icon="account-multiple-plus-outline"
-                onPress={() => setShowCreate((value) => !value)}
-                size="sm"
-              />
+              <View style={styles.headerActions}>
+                <Button
+                  title={isMobile ? "Dash" : "Dashboard"}
+                  icon="chart-box-outline"
+                  variant="secondary"
+                  onPress={() => router.push("/collaboration/dashboard")}
+                  size="sm"
+                />
+                <Button
+                  title={isMobile ? "Novo" : "Novo grupo"}
+                  icon="account-multiple-plus-outline"
+                  onPress={() => setShowCreate((value) => !value)}
+                  size="sm"
+                />
+              </View>
             }
           />
 
@@ -236,6 +245,11 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: spacing.xxxl,
     gap: spacing.lg
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm
   },
   formCard: {
     marginBottom: spacing.lg

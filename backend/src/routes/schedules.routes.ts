@@ -8,6 +8,12 @@ import {
   encryptScheduleData
 } from "../services/privateData.service";
 
+const userSummarySelect = {
+  id: true,
+  name: true,
+  email: true
+};
+
 function accessibleScheduleWhere(userId: string) {
   return {
     OR: [
@@ -41,6 +47,21 @@ export async function schedulesRoutes(app: FastifyInstance) {
         reminders: {
           include: {
             logs: {
+              include: {
+                user: {
+                  select: userSummarySelect
+                }
+              },
+              orderBy: {
+                createdAt: "desc"
+              }
+            },
+            comments: {
+              include: {
+                user: {
+                  select: userSummarySelect
+                }
+              },
               orderBy: {
                 createdAt: "desc"
               }
@@ -108,6 +129,21 @@ export async function schedulesRoutes(app: FastifyInstance) {
       reminders: {
         include: {
           logs: {
+            include: {
+              user: {
+                select: userSummarySelect
+              }
+            },
+            orderBy: {
+              createdAt: "desc"
+            }
+          },
+          comments: {
+            include: {
+              user: {
+                select: userSummarySelect
+              }
+            },
             orderBy: {
               createdAt: "desc"
             }
@@ -142,6 +178,21 @@ export async function schedulesRoutes(app: FastifyInstance) {
         reminders: {
           include: {
             logs: {
+              include: {
+                user: {
+                  select: userSummarySelect
+                }
+              },
+              orderBy: {
+                createdAt: "desc"
+              }
+            },
+            comments: {
+              include: {
+                user: {
+                  select: userSummarySelect
+                }
+              },
               orderBy: {
                 createdAt: "desc"
               }

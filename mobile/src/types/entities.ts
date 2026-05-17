@@ -10,15 +10,28 @@ export type ScheduleCategory =
 
 export type ReminderLog = {
   id: string;
+  userId?: string;
+  reminderId?: string;
   action: "DONE" | "SNOOZED" | "SKIPPED" | "MISSED";
   note?: string | null;
   createdAt: string;
+  user?: UserSummary | null;
 };
 
 export type UserSummary = {
   id: string;
   name: string;
   email: string;
+};
+
+export type ReminderComment = {
+  id: string;
+  userId: string;
+  reminderId: string;
+  message: string;
+  createdAt: string;
+  updatedAt: string;
+  user?: UserSummary | null;
 };
 
 export type Schedule = {
@@ -60,6 +73,7 @@ export type Reminder = {
   status?: "ACTIVE" | "PAUSED" | "FINISHED" | "CANCELED";
   schedule?: Schedule;
   logs?: ReminderLog[];
+  comments?: ReminderComment[];
   assignedUserId?: string | null;
   assignedUser?: UserSummary | null;
 };

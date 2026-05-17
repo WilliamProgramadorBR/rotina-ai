@@ -1,7 +1,18 @@
 type ReminderAction = "DONE" | "SNOOZED" | "SKIPPED" | "MISSED";
 
 type ReminderLogForMetrics = {
+  userId?: string | null;
   action: string;
+  createdAt: Date;
+  user?: {
+    id: string;
+    name: string;
+    email?: string | null;
+  } | null;
+};
+
+type ReminderCommentForMetrics = {
+  id: string;
   createdAt: Date;
 };
 
@@ -12,6 +23,7 @@ type ReminderForMetrics = {
   status?: string | null;
   priority?: string | null;
   logs?: ReminderLogForMetrics[];
+  comments?: ReminderCommentForMetrics[];
 };
 
 type ScheduleForMetrics = {
@@ -19,6 +31,22 @@ type ScheduleForMetrics = {
   category?: string | null;
   sourceType?: string | null;
   reminders?: ReminderForMetrics[];
+};
+
+type CollaborationGroupForMetrics = {
+  id: string;
+  name: string;
+  description?: string | null;
+  members?: Array<{
+    userId: string;
+    role: string;
+    user?: {
+      id: string;
+      name: string;
+      email?: string | null;
+    } | null;
+  }>;
+  schedules?: ScheduleForMetrics[];
 };
 
 const categoryLabels: Record<string, string> = {
@@ -95,6 +123,16 @@ export function getLatestReminderAction(reminder: ReminderForMetrics): ReminderA
   }
 
   return null;
+}
+
+function getLatestDoneLog(reminder: ReminderForMetrics) {
+  if (getLatestReminderAction(reminder) !== "DONE") {
+    return null;
+  }
+
+  return [...(reminder.logs || [])]
+    .filter((log) => log.action === "DONE")
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] || null;
 }
 
 function isFinishedAction(action: ReminderAction | null) {
@@ -263,5 +301,103 @@ export function buildDashboardMetrics(schedules: ScheduleForMetrics[]) {
     categories,
     priorities,
     insights
+  };
+}
+
+export function buildCollaborationDashboardMetrics(groups: CollaborationGroupForMetrics[]) {
+  const groupMetrics = groups.map((group) => {
+    const schedules = group.schedules || [];
+    const metrics = buildDashboardMetrics(schedules);
+    const reminders = schedules.flatMap((schedule) => schedule.reminders || []);
+    const contributionMap = new Map<string, {
+      userId: string;
+      name: string;
+      role: string;
+      done: number;
+    }>();
+
+    for (const member of group.members || []) {
+      contributionMap.set(member.userId, {
+        userId: member.userId,
+        name: member.user?.name || "Membro",
+        role: member.role,
+        done: 0
+      });
+    }
+
+    for (const reminder of reminders) {
+      const doneLog = getLatestDoneLog(reminder);
+      const doneUserId = doneLog?.userId || doneLog?.user?.id;
+
+      if (!doneUserId) {
+        continue;
+      }
+
+      const current = contributionMap.get(doneUserId) || {
+        userId: doneUserId,
+        name: doneLog?.user?.name || "Membro",
+        role: "MEMBER",
+        done: 0
+      };
+
+      contributionMap.set(doneUserId, {
+        ...current,
+        done: current.done + 1
+      });
+    }
+
+    const comments = reminders.reduce((total, reminder) => total + (reminder.comments?.length || 0), 0);
+    const topContributors = [...contributionMap.values()]
+      .sort((a, b) => b.done - a.done || a.name.localeCompare(b.name, "pt-BR"))
+      .slice(0, 5);
+
+    return {
+      groupId: group.id,
+      groupName: group.name,
+      description: group.description || null,
+      members: group.members?.length || 0,
+      schedules: schedules.length,
+      comments,
+      summary: metrics.summary,
+      weekly: metrics.weekly,
+      topContributors,
+      insights: metrics.insights
+    };
+  });
+
+  const allSchedules = groups.flatMap((group) => group.schedules || []);
+  const overall = buildDashboardMetrics(allSchedules);
+  const totalComments = groupMetrics.reduce((total, group) => total + group.comments, 0);
+  const activeGroups = groupMetrics.filter((group) => group.summary.totalReminders > 0).length;
+  const bestGroup = [...groupMetrics]
+    .filter((group) => group.summary.totalReminders > 0)
+    .sort((a, b) =>
+      b.summary.completionRate - a.summary.completionRate ||
+      b.summary.doneReminders - a.summary.doneReminders
+    )[0] || null;
+
+  return {
+    summary: {
+      ...overall.summary,
+      totalGroups: groups.length,
+      activeGroups,
+      totalComments
+    },
+    weekly: overall.weekly,
+    groups: groupMetrics,
+    insights: [
+      groups.length === 0
+        ? "Voce ainda nao participa de grupos colaborativos."
+        : `Voce participa de ${groups.length} grupo${groups.length === 1 ? "" : "s"} colaborativo${groups.length === 1 ? "" : "s"}.`,
+      activeGroups > 0
+        ? `${activeGroups} grupo${activeGroups === 1 ? "" : "s"} tem tarefas cadastradas para acompanhar.`
+        : "Crie tarefas em um grupo para liberar metricas colaborativas.",
+      bestGroup
+        ? `${bestGroup.groupName} e o grupo com melhor conclusao, em ${bestGroup.summary.completionRate}%.`
+        : "A comparacao entre grupos aparece quando houver tarefas concluidas.",
+      totalComments > 0
+        ? `${totalComments} comentario${totalComments === 1 ? "" : "s"} registrado${totalComments === 1 ? "" : "s"} nas tarefas de grupo.`
+        : "Comentarios de tarefa ajudam o grupo a registrar contexto e decisoes."
+    ]
   };
 }

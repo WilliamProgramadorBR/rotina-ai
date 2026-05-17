@@ -12,6 +12,7 @@ import {
   createCollaborationScheduleRequest,
   getCollaborationGroupRequest,
   inviteCollaborationMemberRequest,
+  leaveCollaborationGroupRequest,
   suggestCollaborationScheduleRequest
 } from "../../src/services/collaboration";
 import { fonts, radius, spacing, scaledFont } from "../../src/theme";
@@ -42,6 +43,7 @@ export default function CollaborationDetailScreen() {
   const [isInviting, setIsInviting] = useState(false);
   const [isCreatingSchedule, setIsCreatingSchedule] = useState(false);
   const [isCreatingWithAi, setIsCreatingWithAi] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
 
   const isMobile = isPhone || isSmallPhone;
 
@@ -149,6 +151,34 @@ export default function CollaborationDetailScreen() {
     }
   }
 
+  function handleLeaveGroup() {
+    if (!group) return;
+
+    Alert.alert(
+      "Sair do grupo",
+      "Voce deixara de ver as rotinas compartilhadas deste grupo. Se voce for o unico membro, o grupo sera removido.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Sair",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsLeaving(true);
+              const result = await leaveCollaborationGroupRequest(groupId);
+              router.replace("/collaboration");
+              Alert.alert("Grupo", result.message || "Voce saiu do grupo.");
+            } catch (error: any) {
+              Alert.alert("Erro", error?.response?.data?.message || "Nao foi possivel sair do grupo.");
+            } finally {
+              setIsLeaving(false);
+            }
+          }
+        }
+      ]
+    );
+  }
+
   return (
     <ScreenLayout>
       {({ openMenu, isWide }) => (
@@ -158,13 +188,25 @@ export default function CollaborationDetailScreen() {
             subtitle={group?.description || "Rotina compartilhada com tarefas em conjunto"}
             onMenu={isWide ? undefined : openMenu}
             right={
-              <Button
-                title={isMobile ? "Voltar" : "Grupos"}
-                icon="arrow-left"
-                variant="secondary"
-                size="sm"
-                onPress={() => router.push("/collaboration")}
-              />
+              <View style={styles.headerActions}>
+                <Button
+                  title={isMobile ? "Voltar" : "Grupos"}
+                  icon="arrow-left"
+                  variant="secondary"
+                  size="sm"
+                  onPress={() => router.push("/collaboration")}
+                />
+                {group ? (
+                  <Button
+                    title="Sair"
+                    icon="logout"
+                    variant="danger"
+                    size="sm"
+                    onPress={handleLeaveGroup}
+                    loading={isLeaving}
+                  />
+                ) : null}
+              </View>
             }
           />
 
@@ -334,6 +376,11 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: spacing.xxxl,
     gap: spacing.lg
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm
   },
   statsGrid: {
     flexDirection: "row",

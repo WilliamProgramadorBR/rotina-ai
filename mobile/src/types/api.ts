@@ -39,9 +39,16 @@ export type User = {
   createdAt?: string;
 };
 
+export type UserSummary = {
+  id: string;
+  name: string;
+  email: string;
+};
+
 export type Schedule = {
   id: string;
   userId: string;
+  groupId?: string | null;
   title: string;
   description?: string | null;
   notes?: string | null;
@@ -72,6 +79,17 @@ export type ReminderLog = {
   action: ReminderAction;
   note?: string | null;
   createdAt: string;
+  user?: UserSummary | null;
+};
+
+export type ReminderComment = {
+  id: string;
+  userId: string;
+  reminderId: string;
+  message: string;
+  createdAt: string;
+  updatedAt: string;
+  user?: UserSummary | null;
 };
 
 export type Reminder = {
@@ -93,6 +111,9 @@ export type Reminder = {
   updatedAt: string;
   schedule?: Schedule;
   logs?: ReminderLog[];
+  comments?: ReminderComment[];
+  assignedUserId?: string | null;
+  assignedUser?: UserSummary | null;
 };
 
 export type DashboardMetrics = {
@@ -139,4 +160,29 @@ export type DashboardMetrics = {
     completionRate: number;
   }>;
   insights: string[];
+};
+
+export type CollaborationDashboardMetrics = DashboardMetrics & {
+  summary: DashboardMetrics["summary"] & {
+    totalGroups: number;
+    activeGroups: number;
+    totalComments: number;
+  };
+  groups: Array<{
+    groupId: string;
+    groupName: string;
+    description?: string | null;
+    members: number;
+    schedules: number;
+    comments: number;
+    summary: DashboardMetrics["summary"];
+    weekly: DashboardMetrics["weekly"];
+    topContributors: Array<{
+      userId: string;
+      name: string;
+      role: string;
+      done: number;
+    }>;
+    insights: string[];
+  }>;
 };

@@ -3,6 +3,7 @@ import {
   CollaborationGroup,
   CollaborationInvite,
   Reminder,
+  ReminderComment,
   Schedule,
   ScheduleSuggestion
 } from "../types/entities";
@@ -34,6 +35,13 @@ export async function inviteCollaborationMemberRequest(groupId: string, payload:
     payload
   );
   return data.invite;
+}
+
+export async function leaveCollaborationGroupRequest(groupId: string) {
+  const { data } = await api.delete<{ message: string; groupDeleted: boolean }>(
+    `/collaboration/groups/${groupId}/membership`
+  );
+  return data;
 }
 
 export async function listCollaborationInvitesRequest() {
@@ -103,4 +111,15 @@ export async function assignCollaborationReminderRequest(
     { assignedUserId }
   );
   return data.reminder;
+}
+
+export async function createCollaborationReminderCommentRequest(
+  reminderId: string,
+  payload: { message: string }
+) {
+  const { data } = await api.post<{ comment: ReminderComment }>(
+    `/collaboration/reminders/${reminderId}/comments`,
+    payload
+  );
+  return data.comment;
 }

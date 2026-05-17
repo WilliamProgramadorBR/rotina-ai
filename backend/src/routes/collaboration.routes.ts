@@ -12,9 +12,11 @@ import {
   decryptCollaborationGroups,
   decryptCollaborationInvite,
   decryptCollaborationInvites,
+  decryptReminderComment,
   decryptSchedule,
   encryptCollaborationGroupData,
   encryptCollaborationInviteData,
+  encryptReminderCommentData,
   encryptReminderData,
   encryptScheduleData
 } from "../services/privateData.service";
@@ -54,6 +56,16 @@ const scheduleBodySchema = z.object({
 const assignReminderSchema = z.object({
   assignedUserId: z.string().nullable()
 });
+
+const commentBodySchema = z.object({
+  message: z.string().trim().min(1).max(800)
+});
+
+const userSummarySelect = {
+  id: true,
+  name: true,
+  email: true
+};
 
 function normalizeLinks(links?: string[]) {
   if (!links || links.length === 0) {
@@ -113,20 +125,12 @@ async function requireManager(groupId: string, userId: string, reply: any) {
 function groupInclude() {
   return {
     owner: {
-      select: {
-        id: true,
-        name: true,
-        email: true
-      }
+      select: userSummarySelect
     },
     members: {
       include: {
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
+          select: userSummarySelect
         }
       },
       orderBy: {
@@ -136,18 +140,10 @@ function groupInclude() {
     invites: {
       include: {
         invitedBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
+          select: userSummarySelect
         },
         invitedUser: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
+          select: userSummarySelect
         }
       },
       orderBy: {
@@ -159,16 +155,27 @@ function groupInclude() {
         reminders: {
           include: {
             logs: {
+              include: {
+                user: {
+                  select: userSummarySelect
+                }
+              },
+              orderBy: {
+                createdAt: "desc" as const
+              }
+            },
+            comments: {
+              include: {
+                user: {
+                  select: userSummarySelect
+                }
+              },
               orderBy: {
                 createdAt: "desc" as const
               }
             },
             assignedUser: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
+              select: userSummarySelect
             }
           },
           orderBy: {
@@ -304,6 +311,89 @@ export async function collaborationRoutes(app: FastifyInstance) {
     };
   });
 
+  app.delete("/groups/:groupId/membership", async (request, reply) => {
+    const paramsSchema = z.object({
+      groupId: z.string()
+    });
+
+    const userId = request.user.sub;
+    const { groupId } = paramsSchema.parse(request.params);
+
+    const membership = await requireMembership(groupId, userId, reply);
+    if (!membership) return;
+
+    const otherMembers = await prisma.collaborationMember.findMany({
+      where: {
+        groupId,
+        userId: {
+          not: userId
+        }
+      },
+      orderBy: {
+        joinedAt: "asc"
+      }
+    });
+    const nextOwner = otherMembers.find((member) => member.role === "ADMIN") || otherMembers[0] || null;
+
+    await prisma.$transaction(async (transaction) => {
+      await transaction.reminder.updateMany({
+        where: {
+          assignedUserId: userId,
+          schedule: {
+            groupId
+          }
+        },
+        data: {
+          assignedUserId: null
+        }
+      });
+
+      if (membership.role === "OWNER" && !nextOwner) {
+        await transaction.collaborationGroup.delete({
+          where: {
+            id: groupId
+          }
+        });
+        return;
+      }
+
+      if (membership.role === "OWNER" && nextOwner) {
+        await transaction.collaborationMember.update({
+          where: {
+            id: nextOwner.id
+          },
+          data: {
+            role: "OWNER"
+          }
+        });
+        await transaction.collaborationGroup.update({
+          where: {
+            id: groupId
+          },
+          data: {
+            ownerId: nextOwner.userId
+          }
+        });
+      }
+
+      await transaction.collaborationMember.delete({
+        where: {
+          groupId_userId: {
+            groupId,
+            userId
+          }
+        }
+      });
+    });
+
+    return reply.status(200).send({
+      message: membership.role === "OWNER" && !nextOwner
+        ? "Grupo removido porque voce era o ultimo membro."
+        : "Voce saiu do grupo.",
+      groupDeleted: membership.role === "OWNER" && !nextOwner
+    });
+  });
+
   app.post("/groups/:groupId/invites", async (request, reply) => {
     const paramsSchema = z.object({
       groupId: z.string()
@@ -335,11 +425,7 @@ export async function collaborationRoutes(app: FastifyInstance) {
       where: {
         email: data.email
       },
-      select: {
-        id: true,
-        name: true,
-        email: true
-      }
+      select: userSummarySelect
     });
 
     if (invitedUser) {
@@ -383,18 +469,10 @@ export async function collaborationRoutes(app: FastifyInstance) {
           include: groupInclude()
         },
         invitedBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
+          select: userSummarySelect
         },
         invitedUser: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
+          select: userSummarySelect
         }
       }
     });
@@ -433,11 +511,7 @@ export async function collaborationRoutes(app: FastifyInstance) {
           include: groupInclude()
         },
         invitedBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
+          select: userSummarySelect
         }
       },
       orderBy: {
@@ -578,11 +652,7 @@ export async function collaborationRoutes(app: FastifyInstance) {
           include: groupInclude()
         },
         invitedBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
+          select: userSummarySelect
         }
       }
     });
@@ -620,16 +690,27 @@ export async function collaborationRoutes(app: FastifyInstance) {
         reminders: {
           include: {
             logs: {
+              include: {
+                user: {
+                  select: userSummarySelect
+                }
+              },
+              orderBy: {
+                createdAt: "desc"
+              }
+            },
+            comments: {
+              include: {
+                user: {
+                  select: userSummarySelect
+                }
+              },
               orderBy: {
                 createdAt: "desc"
               }
             },
             assignedUser: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
+              select: userSummarySelect
             }
           },
           orderBy: {
@@ -742,16 +823,27 @@ export async function collaborationRoutes(app: FastifyInstance) {
         reminders: {
           include: {
             logs: {
+              include: {
+                user: {
+                  select: userSummarySelect
+                }
+              },
+              orderBy: {
+                createdAt: "desc"
+              }
+            },
+            comments: {
+              include: {
+                user: {
+                  select: userSummarySelect
+                }
+              },
               orderBy: {
                 createdAt: "desc"
               }
             },
             assignedUser: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
+              select: userSummarySelect
             }
           },
           orderBy: {
@@ -763,6 +855,55 @@ export async function collaborationRoutes(app: FastifyInstance) {
 
     return reply.status(201).send({
       schedule: withScheduleProgress(decryptSchedule(schedule))
+    });
+  });
+
+  app.post("/reminders/:reminderId/comments", async (request, reply) => {
+    const paramsSchema = z.object({
+      reminderId: z.string()
+    });
+
+    const userId = request.user.sub;
+    const { reminderId } = paramsSchema.parse(request.params);
+    const data = commentBodySchema.parse(request.body);
+
+    const reminder = await prisma.reminder.findUnique({
+      where: {
+        id: reminderId
+      },
+      include: {
+        schedule: {
+          select: {
+            groupId: true
+          }
+        }
+      }
+    });
+
+    if (!reminder?.schedule.groupId) {
+      return reply.status(404).send({
+        message: "Tarefa colaborativa nao encontrada."
+      });
+    }
+
+    const membership = await requireMembership(reminder.schedule.groupId, userId, reply);
+    if (!membership) return;
+
+    const comment = await prisma.reminderComment.create({
+      data: encryptReminderCommentData({
+        reminderId,
+        userId,
+        message: data.message
+      }),
+      include: {
+        user: {
+          select: userSummarySelect
+        }
+      }
+    });
+
+    return reply.status(201).send({
+      comment: decryptReminderComment(comment)
     });
   });
 
@@ -813,16 +954,27 @@ export async function collaborationRoutes(app: FastifyInstance) {
       include: {
         schedule: true,
         logs: {
+          include: {
+            user: {
+              select: userSummarySelect
+            }
+          },
+          orderBy: {
+            createdAt: "desc"
+          }
+        },
+        comments: {
+          include: {
+            user: {
+              select: userSummarySelect
+            }
+          },
           orderBy: {
             createdAt: "desc"
           }
         },
         assignedUser: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
+          select: userSummarySelect
         }
       }
     });

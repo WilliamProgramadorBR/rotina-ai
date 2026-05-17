@@ -75,7 +75,7 @@ export default function DashboardScreen() {
         <View>
           <PageHeader
             title="Dashboard"
-            subtitle="Metricas reais da sua rotina"
+            subtitle="Metricas das suas tarefas individuais"
             onMenu={isWide ? undefined : openMenu}
             right={
               <Pressable
@@ -117,7 +117,7 @@ export default function DashboardScreen() {
               <AiPanel
                 eyebrow="INTELIGENCIA DA ROTINA"
                 title={`${overdueReminders} ${overdueReminders === 1 ? "atividade atrasada" : "atividades atrasadas"} sem conclusao.`}
-                description="Acompanhe desempenho, categorias fortes, pendencias e uso da IA com dados reais do backend."
+                description="Acompanhe desempenho, categorias fortes, pendencias e uso da IA apenas nas tarefas fora dos grupos."
                 icon="chart-timeline-variant"
                 metric={`${metrics.summary.completionRate}%`}
                 metricLabel="conclusao"
@@ -179,7 +179,7 @@ export default function DashboardScreen() {
                   <Text style={[styles.panelTitle, { color: theme.text, fontSize: scaledFont(17, width) }]}>Resumo operacional</Text>
                   <View style={styles.kpiList}>
                     <KpiRow label="Cronogramas ativos" value={metrics.summary.activeSchedules} />
-                    <KpiRow label="Lembretes criados" value={metrics.summary.totalReminders} />
+                    <KpiRow label="Tarefas individuais" value={metrics.summary.totalReminders} />
                     <KpiRow label="Atrasados sem conclusao" value={overdueReminders} />
                     <KpiRow label="Feitos" value={metrics.summary.doneReminders} />
                     <KpiRow label="Adiados" value={metrics.summary.snoozedReminders} />

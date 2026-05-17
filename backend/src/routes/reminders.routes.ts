@@ -38,6 +38,12 @@ const reminderActionSchema = z.enum([
   "MISSED"
 ]);
 
+const userSummarySelect = {
+  id: true,
+  name: true,
+  email: true
+};
+
 function normalizeLinks(links?: string[]) {
   if (!links || links.length === 0) {
     return undefined;
@@ -125,6 +131,21 @@ export async function remindersRoutes(app: FastifyInstance) {
       include: {
         schedule: true,
         logs: {
+          include: {
+            user: {
+              select: userSummarySelect
+            }
+          },
+          orderBy: {
+            createdAt: "desc"
+          }
+        },
+        comments: {
+          include: {
+            user: {
+              select: userSummarySelect
+            }
+          },
           orderBy: {
             createdAt: "desc"
           }
@@ -164,6 +185,21 @@ export async function remindersRoutes(app: FastifyInstance) {
       include: {
         schedule: true,
         logs: {
+          include: {
+            user: {
+              select: userSummarySelect
+            }
+          },
+          orderBy: {
+            createdAt: "desc"
+          }
+        },
+        comments: {
+          include: {
+            user: {
+              select: userSummarySelect
+            }
+          },
           orderBy: {
             createdAt: "desc"
           }
@@ -243,6 +279,21 @@ export async function remindersRoutes(app: FastifyInstance) {
       include: {
         schedule: true,
         logs: {
+          include: {
+            user: {
+              select: userSummarySelect
+            }
+          },
+          orderBy: {
+            createdAt: "desc"
+          }
+        },
+        comments: {
+          include: {
+            user: {
+              select: userSummarySelect
+            }
+          },
           orderBy: {
             createdAt: "desc"
           }
@@ -317,6 +368,21 @@ export async function remindersRoutes(app: FastifyInstance) {
       include: {
         schedule: true,
         logs: {
+          include: {
+            user: {
+              select: userSummarySelect
+            }
+          },
+          orderBy: {
+            createdAt: "desc"
+          }
+        },
+        comments: {
+          include: {
+            user: {
+              select: userSummarySelect
+            }
+          },
           orderBy: {
             createdAt: "desc"
           }
@@ -364,7 +430,12 @@ export async function remindersRoutes(app: FastifyInstance) {
         reminderId: id,
         action,
         note
-      })
+      }),
+      include: {
+        user: {
+          select: userSummarySelect
+        }
+      }
     });
 
     return reply.status(201).send({
@@ -410,6 +481,21 @@ export async function remindersRoutes(app: FastifyInstance) {
       include: {
         schedule: true,
         logs: {
+          include: {
+            user: {
+              select: userSummarySelect
+            }
+          },
+          orderBy: {
+            createdAt: "desc"
+          }
+        },
+        comments: {
+          include: {
+            user: {
+              select: userSummarySelect
+            }
+          },
           orderBy: {
             createdAt: "desc"
           }
