@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { Button, Card, Input, SectionTitle } from "../src/components/ui";
 import { PageHeader } from "../src/components/PageHeader";
@@ -25,14 +26,27 @@ import {
   scheduleWeeklyReport,
   cancelWeeklyReport
 } from "../src/services/weeklyReport";
+import {
+  getNotificationPreferencesRequest,
+  updateNotificationPreferencesRequest
+} from "../src/services/notificationPreferences";
+import { uploadAvatarRequest } from "../src/services/auth";
 import { DashboardMetrics } from "../src/types/api";
 import { useThemeMode } from "../src/context/ThemeContext";
 import { IconSymbol } from "../src/components/IconSymbol";
+import { useAuth } from "../src/context/AuthContext";
 
 export default function SettingsScreen() {
   const { width, isPhone, isSmallPhone, isPhoneLarge, gap } = useResponsive();
   const { mode, setMode, theme, isDark } = useThemeMode();
+  const { user, updateProfile } = useAuth();
   const isMobile = isPhone || isSmallPhone || isPhoneLarge;
+  const [profileName, setProfileName] = useState(user?.name || "");
+  const [profileEmail, setProfileEmail] = useState(user?.email || "");
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState(user?.avatarUrl || "");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarPreviewFailed, setAvatarPreviewFailed] = useState(false);
   const [apiUrl, setApiUrl] = useState(getDefaultApiBaseUrl());
   const [isSavingApiUrl, setIsSavingApiUrl] = useState(false);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardMetrics["summary"] | null>(null);
@@ -43,12 +57,16 @@ export default function SettingsScreen() {
   const [weeklyEnabled, setWeeklyEnabled] = useState(true);
   const [weeklyHour, setWeeklyHour] = useState(9);
   const [isTestingWeekly, setIsTestingWeekly] = useState(false);
+  const [chatNotificationsEnabled, setChatNotificationsEnabled] = useState(true);
 
   useEffect(() => {
     getApiBaseUrl().then(setApiUrl);
     getCustomRingtone().then(setCustomRingtone);
     getWeeklyReportEnabled().then(setWeeklyEnabled);
     getWeeklyReportHour().then(setWeeklyHour);
+    getNotificationPreferencesRequest()
+      .then((pref) => setChatNotificationsEnabled(pref.chatNotificationsEnabled))
+      .catch(() => {});
     getDashboardMetricsRequest()
       .then((metrics) => setDashboardSummary(metrics.summary))
       .catch((error) => console.log("[SETTINGS METRICS ERROR]", error?.response?.data || error));
@@ -61,6 +79,84 @@ export default function SettingsScreen() {
       stopAlarmRingtone();
     };
   }, []);
+
+  useEffect(() => {
+    setProfileName(user?.name || "");
+    setProfileEmail(user?.email || "");
+    setProfileAvatarUrl(user?.avatarUrl || "");
+    setAvatarPreviewFailed(false);
+  }, [user?.id, user?.name, user?.email, user?.avatarUrl]);
+
+  async function handleSaveProfile() {
+    const name = profileName.trim();
+    const email = profileEmail.trim().toLowerCase();
+    const avatarUrl = profileAvatarUrl.trim();
+
+    if (name.length < 2) {
+      Alert.alert("Nome invalido", "Informe um nome com pelo menos 2 caracteres.");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      Alert.alert("E-mail invalido", "Informe um e-mail valido.");
+      return;
+    }
+
+    if (avatarUrl && !avatarUrl.startsWith("https://")) {
+      Alert.alert("URL invalida", "Use uma URL HTTPS para a foto do perfil.");
+      return;
+    }
+
+    try {
+      setIsSavingProfile(true);
+      await updateProfile({
+        name,
+        email,
+        avatarUrl: avatarUrl || null
+      });
+      setAvatarPreviewFailed(false);
+      Alert.alert("Perfil salvo", "Seus dados foram atualizados.");
+    } catch (error: any) {
+      Alert.alert("Erro", error?.response?.data?.message || "Nao foi possivel atualizar o perfil.");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }
+
+  function handleClearAvatar() {
+    setProfileAvatarUrl("");
+    setAvatarPreviewFailed(false);
+  }
+
+  async function handlePickImage() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permissao necessaria", "Permita o acesso a galeria para escolher uma foto.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: "images",
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.75
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    try {
+      setIsUploadingAvatar(true);
+      const avatarUrl = await uploadAvatarRequest(result.assets[0].uri);
+      setProfileAvatarUrl(avatarUrl);
+      setAvatarPreviewFailed(false);
+      await updateProfile({ name: profileName.trim(), email: profileEmail.trim().toLowerCase(), avatarUrl });
+      Alert.alert("Foto atualizada", "Sua foto de perfil foi salva com sucesso.");
+    } catch (error: any) {
+      Alert.alert("Erro", error?.response?.data?.message || "Nao foi possivel enviar a foto.");
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  }
 
   async function handleTestAlarm() {
     try {
@@ -195,6 +291,16 @@ export default function SettingsScreen() {
     }
   }
 
+  async function handleToggleChatNotifications(value: boolean) {
+    setChatNotificationsEnabled(value);
+    try {
+      await updateNotificationPreferencesRequest({ chatNotificationsEnabled: value });
+    } catch {
+      setChatNotificationsEnabled(!value);
+      Alert.alert("Erro", "Nao foi possivel salvar a preferencia.");
+    }
+  }
+
   async function handleClearRingtone() {
     try {
       if (previewTimeoutRef.current) {
@@ -210,6 +316,9 @@ export default function SettingsScreen() {
       Alert.alert("Erro", error?.message || "Nao foi possivel remover o toque.");
     }
   }
+
+  const avatarPreviewUrl = profileAvatarUrl.trim();
+  const profileInitial = (profileName || user?.name || "U").slice(0, 1).toUpperCase();
 
   return (
     <ScreenLayout>
@@ -315,6 +424,81 @@ export default function SettingsScreen() {
 
             {/* Right Column */}
             <View style={[styles.rightColumn, isMobile && styles.columnMobile, { gap }]}>
+              <Card style={[styles.profileCard, isMobile && styles.profileCardMobile]}>
+                <SectionTitle
+                  title="Perfil"
+                  subtitle="Atualize seus dados e a foto que aparece no app."
+                />
+                <View style={[styles.profileHeader, isMobile && styles.profileHeaderMobile]}>
+                  <Pressable
+                    onPress={handlePickImage}
+                    disabled={isUploadingAvatar}
+                    style={[styles.profileAvatar, { backgroundColor: theme.primarySoft, borderColor: theme.primary }]}
+                  >
+                    {avatarPreviewUrl && !avatarPreviewFailed ? (
+                      <Image
+                        source={{ uri: avatarPreviewUrl }}
+                        style={styles.profileAvatarImage}
+                        onError={() => setAvatarPreviewFailed(true)}
+                      />
+                    ) : (
+                      <Text style={[styles.profileAvatarText, { color: theme.primary, fontSize: scaledFont(26, width) }]}>
+                        {profileInitial}
+                      </Text>
+                    )}
+                    <View style={[styles.avatarCameraOverlay, { backgroundColor: theme.primary }]}>
+                      {isUploadingAvatar
+                        ? <ActivityIndicator size={12} color="#fff" />
+                        : <IconSymbol name="camera-outline" size={12} color="#fff" />
+                      }
+                    </View>
+                  </Pressable>
+                  <View style={styles.profileSummary}>
+                    <Text style={[styles.profileName, { color: theme.text, fontSize: scaledFont(16, width) }]} numberOfLines={1}>
+                      {profileName || "Usuario"}
+                    </Text>
+                    <Text style={[styles.profileEmail, { color: theme.textMuted, fontSize: scaledFont(12, width) }]} numberOfLines={1}>
+                      {profileEmail || "email@exemplo.com"}
+                    </Text>
+                  </View>
+                </View>
+                <Input
+                  label="Nome"
+                  value={profileName}
+                  onChangeText={setProfileName}
+                  autoCapitalize="words"
+                  size={isMobile ? "sm" : "md"}
+                />
+                <Input
+                  label="E-mail"
+                  value={profileEmail}
+                  onChangeText={setProfileEmail}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  size={isMobile ? "sm" : "md"}
+                />
+                <View style={[styles.profileActions, isMobile && styles.profileActionsMobile, { gap: spacing.sm }]}>
+                  <Button
+                    title="Salvar perfil"
+                    variant="ai"
+                    onPress={handleSaveProfile}
+                    loading={isSavingProfile}
+                    disabled={isUploadingAvatar}
+                    style={[styles.profileActionButton, isMobile && styles.profileActionButtonMobile]}
+                    size={isMobile ? "md" : "lg"}
+                  />
+                  <Button
+                    title="Remover foto"
+                    variant="secondary"
+                    onPress={handleClearAvatar}
+                    disabled={isSavingProfile || isUploadingAvatar || !profileAvatarUrl}
+                    style={[styles.profileActionButton, isMobile && styles.profileActionButtonMobile]}
+                    size={isMobile ? "md" : "lg"}
+                  />
+                </View>
+              </Card>
+
               <Card style={[styles.themeCard, isMobile && styles.themeCardMobile]}>
                 <SectionTitle
                   title="Aparencia"
@@ -485,6 +669,28 @@ export default function SettingsScreen() {
                 />
               </Card>
 
+              {/* Chat Notifications Card */}
+              <Card style={[styles.weeklyCard, isMobile && styles.weeklyCardMobile]}>
+                <SectionTitle
+                  title="Notificacoes do grupo"
+                  subtitle="Receba alertas quando alguem enviar mensagem no chat do grupo, igual ao WhatsApp."
+                />
+                <View style={[styles.weeklyRow, { borderColor: theme.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.weeklyRowLabel, { color: theme.text, fontSize: scaledFont(14, width) }]}>Ativar notificacoes do chat</Text>
+                    <Text style={[styles.weeklyRowSub, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>
+                      {chatNotificationsEnabled ? "Voce sera avisado de novas mensagens" : "Notificacoes de chat desativadas"}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={chatNotificationsEnabled}
+                    onValueChange={handleToggleChatNotifications}
+                    trackColor={{ false: theme.border, true: theme.primary }}
+                    thumbColor={chatNotificationsEnabled ? "#fff" : theme.textMuted}
+                  />
+                </View>
+              </Card>
+
               {/* API Connection Card */}
               <Card style={[styles.apiCard, isMobile && styles.apiCardMobile]}>
                 <SectionTitle
@@ -539,7 +745,7 @@ export default function SettingsScreen() {
                   Conta Expo: williamdevbackend
                 </Text>
                 <Text style={[styles.creditsText, { color: theme.textMuted, fontSize: scaledFont(12, width) }]}>
-                  Versao 3.0.0
+                  Versao 3.2.2
                 </Text>
                 <Button
                   title="Privacidade e termos"
@@ -624,6 +830,71 @@ const styles = StyleSheet.create({
   columnMobile: {
     flex: 1,
     width: "100%"
+  },
+  profileCard: {
+    padding: spacing.lg
+  },
+  profileCardMobile: {
+    padding: spacing.md
+  },
+  profileHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    marginBottom: spacing.md
+  },
+  profileHeaderMobile: {
+    alignItems: "flex-start"
+  },
+  profileAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  profileAvatarImage: {
+    width: "100%",
+    height: "100%"
+  },
+  profileAvatarText: {
+    fontFamily: fonts.title
+  },
+  avatarCameraOverlay: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  profileSummary: {
+    flex: 1,
+    minWidth: 0
+  },
+  profileName: {
+    fontFamily: fonts.title
+  },
+  profileEmail: {
+    fontFamily: fonts.regular,
+    marginTop: 2
+  },
+  profileActions: {
+    flexDirection: "row"
+  },
+  profileActionsMobile: {
+    flexDirection: "column"
+  },
+  profileActionButton: {
+    flex: 1
+  },
+  profileActionButtonMobile: {
+    width: "100%",
+    flex: 0
   },
   themeCard: {
     padding: spacing.lg

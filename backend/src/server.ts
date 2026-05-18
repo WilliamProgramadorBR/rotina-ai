@@ -1,7 +1,10 @@
 import "dotenv/config";
+import path from "path";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
+import multipart from "@fastify/multipart";
+import fastifyStatic from "@fastify/static";
 import { ZodError } from "zod";
 
 import { authRoutes } from "./routes/auth.routes";
@@ -11,6 +14,7 @@ import { iaRoutes } from "./routes/ia.routes";
 import { metricsRoutes } from "./routes/metrics.routes";
 import { alarmLogsRoutes } from "./routes/alarm-logs.routes";
 import { collaborationRoutes } from "./routes/collaboration.routes";
+import { notificationsRoutes } from "./routes/notifications.routes";
 import {
   isCorsOriginAllowed,
   isUsingJwtSecretForDataEncryption,
@@ -52,6 +56,16 @@ app.addHook("onRequest", createRateLimitPreHandler({
   max: 600,
   windowMs: 60_000
 }));
+
+app.register(multipart);
+
+app.register(fastifyStatic, {
+  root: path.join(process.cwd(), "uploads"),
+  prefix: "/uploads/",
+  setHeaders: (res) => {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  }
+});
 
 app.register(cors, {
   credentials: true,
@@ -131,6 +145,10 @@ app.register(alarmLogsRoutes, {
 
 app.register(collaborationRoutes, {
   prefix: "/collaboration"
+});
+
+app.register(notificationsRoutes, {
+  prefix: "/notifications"
 });
 
 app.listen({ port: PORT, host: "0.0.0.0" }).then(() => {

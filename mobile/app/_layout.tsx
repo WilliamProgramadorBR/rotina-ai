@@ -21,6 +21,7 @@ import { ThemeProvider, useThemeMode } from "../src/context/ThemeContext";
 import { AppUpdateInstaller } from "../src/components/AppUpdateInstaller";
 import { configureAlarmNotifications } from "../src/services/alarmNotifications";
 import { openAlarmFromNotificationResponse } from "../src/services/alarmNavigation";
+import { registerPushToken, setupChatNotificationChannel } from "../src/services/pushNotifications";
 import { flushOfflineQueue } from "../src/services/offlineSync";
 import { scheduleWeeklyReport } from "../src/services/weeklyReport";
 import { getDashboardMetricsRequest } from "../src/services/metrics";
@@ -31,6 +32,28 @@ import { colors } from "../src/theme";
 
 // Registers the background widget task handler — must be imported at module level
 import "../src/widgets/widgetTask";
+
+function ChatNotificationObserver() {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+
+    setupChatNotificationChannel().catch(() => {});
+    registerPushToken().catch(() => {});
+
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data || {};
+      if (data.type === "CHAT_MESSAGE" && typeof data.groupId === "string") {
+        router.push(`/collaboration/${data.groupId}`);
+      }
+    });
+
+    return () => subscription.remove();
+  }, [user?.id]);
+
+  return null;
+}
 
 function AlarmNotificationObserver() {
   useEffect(() => {
@@ -191,6 +214,7 @@ function RootLayoutContent() {
 
   return (
     <AuthProvider>
+      <ChatNotificationObserver />
       <AlarmNotificationObserver />
       <WeeklyReportObserver />
       <OfflineSyncObserver />

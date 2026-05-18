@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { withScheduleProgress } from "../services/metrics.service";
 import { generateScheduleSuggestion } from "../services/ai-provider.service";
+import { sendExpoPushNotificationBatch, PushPayload } from "../services/pushNotification.service";
 import {
   aiSuggestRequestSchema,
   scheduleSuggestionSchema
@@ -12,16 +13,20 @@ import {
   decryptCollaborationGroups,
   decryptCollaborationInvite,
   decryptCollaborationInvites,
+  decryptCollaborationMessage,
+  decryptCollaborationMessages,
   decryptReminderComment,
   decryptSchedule,
   encryptCollaborationGroupData,
   encryptCollaborationInviteData,
+  encryptCollaborationMessageData,
   encryptReminderCommentData,
   encryptReminderData,
   encryptScheduleData
 } from "../services/privateData.service";
 
 const roleSchema = z.enum(["OWNER", "ADMIN", "MEMBER"]);
+const ONLINE_WINDOW_MS = 90_000;
 
 const groupBodySchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -61,10 +66,15 @@ const commentBodySchema = z.object({
   message: z.string().trim().min(1).max(800)
 });
 
+const chatMessageBodySchema = z.object({
+  message: z.string().trim().min(1).max(1200)
+});
+
 const userSummarySelect = {
   id: true,
   name: true,
-  email: true
+  email: true,
+  avatarUrl: true
 };
 
 function normalizeLinks(links?: string[]) {
@@ -120,6 +130,77 @@ async function requireManager(groupId: string, userId: string, reply: any) {
   }
 
   return membership;
+}
+
+async function touchPresence(groupId: string, userId: string) {
+  const now = new Date();
+
+  return prisma.collaborationPresence.upsert({
+    where: {
+      groupId_userId: {
+        groupId,
+        userId
+      }
+    },
+    create: {
+      groupId,
+      userId,
+      lastSeenAt: now
+    },
+    update: {
+      lastSeenAt: now
+    }
+  });
+}
+
+async function buildPresenceSnapshot(groupId: string, currentUserId: string) {
+  const [members, presences] = await Promise.all([
+    prisma.collaborationMember.findMany({
+      where: {
+        groupId
+      },
+      include: {
+        user: {
+          select: userSummarySelect
+        }
+      },
+      orderBy: {
+        joinedAt: "asc"
+      }
+    }),
+    prisma.collaborationPresence.findMany({
+      where: {
+        groupId
+      }
+    })
+  ]);
+  const presenceByUserId = new Map(presences.map((presence) => [presence.userId, presence]));
+  const now = Date.now();
+
+  return members.map((member) => {
+    const presence = presenceByUserId.get(member.userId);
+    const lastSeenAt = presence?.lastSeenAt || null;
+    const isOnline = lastSeenAt
+      ? now - lastSeenAt.getTime() <= ONLINE_WINDOW_MS
+      : false;
+
+    return {
+      id: presence?.id || `${groupId}:${member.userId}`,
+      groupId,
+      userId: member.userId,
+      lastSeenAt,
+      status: isOnline ? "ONLINE" : "OFFLINE",
+      user: member.user,
+      isCurrentUser: member.userId === currentUserId
+    };
+  });
+}
+
+function addMessageMeta(message: any, currentUserId: string) {
+  return {
+    ...message,
+    isMine: message.userId === currentUserId
+  };
 }
 
 function groupInclude() {
@@ -280,6 +361,124 @@ export async function collaborationRoutes(app: FastifyInstance) {
     return {
       group: addProgressToGroup(group)
     };
+  });
+
+  app.get("/groups/:groupId/chat", async (request, reply) => {
+    const paramsSchema = z.object({
+      groupId: z.string()
+    });
+    const querySchema = z.object({
+      limit: z.coerce.number().int().min(1).max(100).default(50)
+    });
+
+    const userId = request.user.sub;
+    const { groupId } = paramsSchema.parse(request.params);
+    const { limit } = querySchema.parse(request.query);
+
+    const membership = await requireMembership(groupId, userId, reply);
+    if (!membership) return;
+
+    await touchPresence(groupId, userId);
+
+    const [messages, presence] = await Promise.all([
+      prisma.collaborationMessage.findMany({
+        where: {
+          groupId
+        },
+        include: {
+          user: {
+            select: userSummarySelect
+          }
+        },
+        orderBy: {
+          createdAt: "desc"
+        },
+        take: limit
+      }),
+      buildPresenceSnapshot(groupId, userId)
+    ]);
+
+    return {
+      messages: decryptCollaborationMessages(messages)
+        .reverse()
+        .map((message) => addMessageMeta(message, userId)),
+      presence,
+      onlineCount: presence.filter((item) => item.status === "ONLINE").length
+    };
+  });
+
+  app.post("/groups/:groupId/presence", async (request, reply) => {
+    const paramsSchema = z.object({
+      groupId: z.string()
+    });
+
+    const userId = request.user.sub;
+    const { groupId } = paramsSchema.parse(request.params);
+
+    const membership = await requireMembership(groupId, userId, reply);
+    if (!membership) return;
+
+    await touchPresence(groupId, userId);
+
+    const presence = await buildPresenceSnapshot(groupId, userId);
+
+    return {
+      presence,
+      onlineCount: presence.filter((item) => item.status === "ONLINE").length
+    };
+  });
+
+  app.post("/groups/:groupId/chat", async (request, reply) => {
+    const paramsSchema = z.object({
+      groupId: z.string()
+    });
+
+    const userId = request.user.sub;
+    const { groupId } = paramsSchema.parse(request.params);
+    const data = chatMessageBodySchema.parse(request.body);
+
+    const membership = await requireMembership(groupId, userId, reply);
+    if (!membership) return;
+
+    await touchPresence(groupId, userId);
+
+    const message = await prisma.collaborationMessage.create({
+      data: encryptCollaborationMessageData({
+        groupId,
+        userId,
+        message: data.message
+      }),
+      include: {
+        user: {
+          select: userSummarySelect
+        }
+      }
+    });
+
+    await prisma.collaborationGroup.update({
+      where: {
+        id: groupId
+      },
+      data: {
+        updatedAt: new Date()
+      }
+    });
+
+    const presence = await buildPresenceSnapshot(groupId, userId);
+
+    // Disparar push para membros offline com notificações habilitadas (best-effort)
+    void sendChatPushNotifications({
+      groupId,
+      senderUserId: userId,
+      senderName: message.user.name,
+      messageText: data.message
+    });
+
+    return reply.status(201).send({
+      message: addMessageMeta(decryptCollaborationMessage(message), userId),
+      presence,
+      onlineCount: presence.filter((item) => item.status === "ONLINE").length
+    });
   });
 
   app.patch("/groups/:groupId", async (request, reply) => {
@@ -983,4 +1182,59 @@ export async function collaborationRoutes(app: FastifyInstance) {
       reminder: decryptSchedule({ reminders: [updatedReminder] }).reminders?.[0]
     };
   });
+}
+
+async function sendChatPushNotifications(opts: {
+  groupId: string;
+  senderUserId: string;
+  senderName: string;
+  messageText: string;
+}) {
+  const { groupId, senderUserId, senderName, messageText } = opts;
+
+  const group = await prisma.collaborationGroup.findUnique({
+    where: { id: groupId },
+    select: { name: true }
+  });
+
+  if (!group) return;
+
+  const members = await prisma.collaborationMember.findMany({
+    where: {
+      groupId,
+      userId: { not: senderUserId }
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          pushToken: true,
+          notificationPreference: {
+            select: { chatNotificationsEnabled: true }
+          }
+        }
+      }
+    }
+  });
+
+  const preview = messageText.length > 80 ? `${messageText.slice(0, 77)}...` : messageText;
+  const groupName = group.name.length > 40 ? `${group.name.slice(0, 37)}...` : group.name;
+
+  const payloads: PushPayload[] = members
+    .filter((m) => {
+      if (!m.user.pushToken) return false;
+      const pref = m.user.notificationPreference;
+      return pref === null || pref.chatNotificationsEnabled !== false;
+    })
+    .map((m) => ({
+      to: m.user.pushToken as string,
+      title: `💬 ${groupName}`,
+      body: `${senderName}: ${preview}`,
+      data: {
+        type: "CHAT_MESSAGE",
+        groupId
+      }
+    }));
+
+  await sendExpoPushNotificationBatch(payloads);
 }
