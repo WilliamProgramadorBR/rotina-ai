@@ -538,18 +538,18 @@ export default function MeuDiaScreen() {
               )}
             </View>
           )}
+          <SnoozePickerModal
+            visible={snoozeTarget !== null}
+            onClose={() => setSnoozeTarget(null)}
+            onConfirm={(minutes, label) => {
+              if (snoozeTarget) {
+                registerAction(snoozeTarget.id, "SNOOZED", minutes, label);
+              }
+              setSnoozeTarget(null);
+            }}
+          />
         </View>
       )}
-      <SnoozePickerModal
-        visible={snoozeTarget !== null}
-        onClose={() => setSnoozeTarget(null)}
-        onConfirm={(minutes, label) => {
-          if (snoozeTarget) {
-            registerAction(snoozeTarget.id, "SNOOZED", minutes, label);
-          }
-          setSnoozeTarget(null);
-        }}
-      />
     </ScreenLayout>
   );
 }
