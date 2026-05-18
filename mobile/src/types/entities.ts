@@ -22,6 +22,7 @@ export type UserSummary = {
   id: string;
   name: string;
   email: string;
+  avatarUrl?: string | null;
 };
 
 export type ReminderComment = {
@@ -129,6 +130,29 @@ export type CollaborationInvite = {
   invitedBy?: UserSummary;
   invitedUser?: UserSummary | null;
   group?: CollaborationGroup;
+};
+
+export type CollaborationPresenceStatus = "ONLINE" | "OFFLINE";
+
+export type CollaborationPresence = {
+  id: string;
+  groupId: string;
+  userId: string;
+  lastSeenAt?: string | null;
+  status: CollaborationPresenceStatus;
+  user?: UserSummary | null;
+  isCurrentUser?: boolean;
+};
+
+export type CollaborationMessage = {
+  id: string;
+  groupId: string;
+  userId: string;
+  message: string;
+  createdAt: string;
+  updatedAt: string;
+  user?: UserSummary | null;
+  isMine?: boolean;
 };
 
 export type CollaborationGroup = {

@@ -41,7 +41,8 @@ const reminderActionSchema = z.enum([
 const userSummarySelect = {
   id: true,
   name: true,
-  email: true
+  email: true,
+  avatarUrl: true
 };
 
 function normalizeLinks(links?: string[]) {

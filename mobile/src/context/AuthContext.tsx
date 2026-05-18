@@ -23,11 +23,18 @@ type User = {
   id: string;
   name: string;
   email: string;
+  avatarUrl?: string | null;
 };
 
 type AuthResponse = {
   user: User;
   token: string;
+};
+
+type ProfileUpdatePayload = {
+  name?: string;
+  email?: string;
+  avatarUrl?: string | null;
 };
 
 type AuthContextData = {
@@ -39,6 +46,7 @@ type AuthContextData = {
   signUp: (name: string, email: string, password: string, acceptedPrivacy?: boolean) => Promise<void>;
   signOut: () => Promise<void>;
   reloadUser: () => Promise<void>;
+  updateProfile: (payload: ProfileUpdatePayload) => Promise<User>;
 };
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -213,6 +221,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const updateProfile = useCallback(async (payload: ProfileUpdatePayload) => {
+    const response = await api.patch<{ user: User }>("/auth/me", payload);
+    const updatedUser = response.data.user;
+
+    setUser(updatedUser);
+    await saveCachedUser(updatedUser);
+
+    return updatedUser;
+  }, []);
+
   useEffect(() => {
     async function loadSession() {
       try {
@@ -234,9 +252,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signUp,
       signOut,
-      reloadUser
+      reloadUser,
+      updateProfile
     }),
-    [user, token, isLoading, signIn, signUp, signOut, reloadUser]
+    [user, token, isLoading, signIn, signUp, signOut, reloadUser, updateProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

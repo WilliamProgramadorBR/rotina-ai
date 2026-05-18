@@ -2,6 +2,8 @@ import { api } from "./api";
 import {
   CollaborationGroup,
   CollaborationInvite,
+  CollaborationMessage,
+  CollaborationPresence,
   Reminder,
   ReminderComment,
   Schedule,
@@ -41,6 +43,34 @@ export async function leaveCollaborationGroupRequest(groupId: string) {
   const { data } = await api.delete<{ message: string; groupDeleted: boolean }>(
     `/collaboration/groups/${groupId}/membership`
   );
+  return data;
+}
+
+export async function listCollaborationMessagesRequest(groupId: string) {
+  const { data } = await api.get<{
+    messages: CollaborationMessage[];
+    presence: CollaborationPresence[];
+    onlineCount: number;
+  }>(`/collaboration/groups/${groupId}/chat`);
+  return data;
+}
+
+export async function pingCollaborationPresenceRequest(groupId: string) {
+  const { data } = await api.post<{
+    presence: CollaborationPresence[];
+    onlineCount: number;
+  }>(`/collaboration/groups/${groupId}/presence`);
+  return data;
+}
+
+export async function sendCollaborationMessageRequest(groupId: string, payload: {
+  message: string;
+}) {
+  const { data } = await api.post<{
+    message: CollaborationMessage;
+    presence: CollaborationPresence[];
+    onlineCount: number;
+  }>(`/collaboration/groups/${groupId}/chat`, payload);
   return data;
 }
 

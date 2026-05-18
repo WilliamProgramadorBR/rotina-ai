@@ -1,6 +1,6 @@
 {
   "name": "rotina-ai-mobile",
-  "version": "3.0.0",
+  "version": "3.2.2",
   "private": true,
   "author": "William Oliveira Dos Santos <william100william@gmail.com>",
   "main": "expo-router/entry",
@@ -20,6 +20,7 @@
     "expo-constants": "latest",
     "expo-file-system": "~55.0.19",
     "expo-font": "~55.0.6",
+    "expo-image-picker": "~55.0.20",
     "expo-linking": "latest",
     "expo-notifications": "latest",
     "expo-router": "latest",

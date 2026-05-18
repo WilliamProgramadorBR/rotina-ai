@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { router, usePathname } from "expo-router";
 import { colors, radius, spacing } from "../theme";
 import { useAuth } from "../context/AuthContext";
@@ -67,9 +67,15 @@ export function SideMenu({ mode = "desktop", onClose }: { mode?: "desktop" | "mo
 
       {/* Card do usuario */}
       <View style={styles.userCard}>
-        <Text style={styles.avatar}>
-          {user?.name?.slice(0, 1).toUpperCase() || "U"}
-        </Text>
+        <View style={styles.avatar}>
+          {user?.avatarUrl ? (
+            <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.avatarText}>
+              {user?.name?.slice(0, 1).toUpperCase() || "U"}
+            </Text>
+          )}
+        </View>
         <View style={styles.userInfo}>
           <Text style={[styles.userName, isSmallScreen && styles.userNameSmall]} numberOfLines={1}>
             {user?.name || "Usuário"}
@@ -226,10 +232,16 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 16,
     backgroundColor: colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden"
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%"
+  },
+  avatarText: {
     color: colors.dark,
-    textAlign: "center",
-    textAlignVertical: "center",
-    lineHeight: 44,
     fontSize: 18,
     fontWeight: "900"
   },

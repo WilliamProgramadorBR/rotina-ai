@@ -11,7 +11,8 @@ import {
 const userSummarySelect = {
   id: true,
   name: true,
-  email: true
+  email: true,
+  avatarUrl: true
 };
 
 function accessibleScheduleWhere(userId: string) {

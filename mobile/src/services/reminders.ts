@@ -124,6 +124,14 @@ export async function updateReminderOfflineSafeRequest(
   }
 }
 
+function formatSnoozeDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}min`;
+}
+
 export async function snoozeReminderRequest(
   reminder: SnoozeReminderInput,
   minutes = 10
@@ -136,7 +144,7 @@ export async function snoozeReminderRequest(
 
   const log = await createReminderLogRequest(reminder.id, {
     action: "SNOOZED",
-    note: `Adiado por ${minutes} minutos pelo app.`
+    note: `Adiado por ${formatSnoozeDuration(minutes)} pelo app.`
   });
 
   let alarmScheduled = false;

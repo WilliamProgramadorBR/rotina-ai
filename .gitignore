@@ -36,6 +36,7 @@ backend/dev.db-journal
 backend/generated/
 
 # Logs
+.codex-runtime/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -48,6 +49,9 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+
+# User uploads (generated at runtime)
+backend/uploads/
 
 # TypeScript / cache
 *.tsbuildinfo

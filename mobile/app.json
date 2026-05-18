@@ -3,7 +3,7 @@
     "name": "Rotina AI",
     "slug": "rotina-ai",
     "description": "Gerenciador de rotinas inteligente desenvolvido por William Oliveira Dos Santos.",
-    "version": "3.0.0",
+    "version": "3.2.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "rotinaai",
@@ -16,6 +16,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O Rotina AI precisa acessar sua galeria para atualizar sua foto de perfil.",
+          "cameraPermission": "O Rotina AI precisa acessar a camera para tirar sua foto de perfil."
+        }
+      ],
       "expo-secure-store",
       [
         "expo-notifications",

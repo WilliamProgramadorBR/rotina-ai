@@ -22,6 +22,7 @@ import { PageHeader } from "../src/components/PageHeader";
 import { IconSymbol } from "../src/components/IconSymbol";
 import { LoadingState } from "../src/components/LoadingState";
 import { ReminderCard } from "../src/components/ReminderCard";
+import { SnoozePickerModal } from "../src/components/SnoozePickerModal";
 import { createReminderLogRequest, snoozeReminderRequest } from "../src/services/reminders";
 import { DashboardMetrics } from "../src/types/api";
 
@@ -95,6 +96,7 @@ export default function MeuDiaScreen() {
   const [summary, setSummary] = useState<DashboardMetrics["summary"] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isReplanning, setIsReplanning] = useState(false);
+  const [snoozeTarget, setSnoozeTarget] = useState<Reminder | null>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
 
   const loadData = useCallback(async (silent = false) => {
@@ -153,20 +155,25 @@ export default function MeuDiaScreen() {
     );
   }
 
-  async function registerAction(reminderId: string, action: "DONE" | "SNOOZED" | "SKIPPED") {
+  async function registerAction(reminderId: string, action: "DONE" | "SNOOZED" | "SKIPPED", minutes?: number, label?: string) {
     try {
       const reminder = reminders.find((item) => item.id === reminderId);
 
       if (action === "SNOOZED" && reminder) {
-        const result = await snoozeReminderRequest(reminder, 10);
+        if (minutes === undefined) {
+          setSnoozeTarget(reminder);
+          return;
+        }
+
+        const result = await snoozeReminderRequest(reminder, minutes);
         applyLocalAction(reminderId, action, result.snoozedStartAt);
 
         Alert.alert(
-          result.queued ? "Adiado offline" : "Soneca ativada",
+          result.queued ? "Adiado offline" : "Tarefa adiada",
           result.queued
             ? "A tarefa foi adiada localmente e sera sincronizada quando a internet voltar."
             : result.alarmScheduled
-            ? "Vou te lembrar novamente em 10 minutos."
+            ? `Vou te lembrar novamente em ${label || `${minutes} min`}.`
             : "A tarefa foi adiada, mas nao consegui agendar a notificacao local."
         );
 
@@ -533,6 +540,16 @@ export default function MeuDiaScreen() {
           )}
         </View>
       )}
+      <SnoozePickerModal
+        visible={snoozeTarget !== null}
+        onClose={() => setSnoozeTarget(null)}
+        onConfirm={(minutes, label) => {
+          if (snoozeTarget) {
+            registerAction(snoozeTarget.id, "SNOOZED", minutes, label);
+          }
+          setSnoozeTarget(null);
+        }}
+      />
     </ScreenLayout>
   );
 }

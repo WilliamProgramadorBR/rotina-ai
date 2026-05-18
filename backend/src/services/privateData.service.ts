@@ -16,6 +16,7 @@ const reminderCommentFields = ["message"] as const;
 const aiRequestFields = ["prompt", "imageUrl", "aiResponseJson"] as const;
 const collaborationGroupFields = ["name", "description"] as const;
 const collaborationInviteFields = ["message"] as const;
+const collaborationMessageFields = ["message"] as const;
 
 function transformFields<T extends AnyRecord | null | undefined>(
   record: T,
@@ -63,6 +64,10 @@ export function encryptCollaborationGroupData<T extends AnyRecord>(data: T): T {
 
 export function encryptCollaborationInviteData<T extends AnyRecord>(data: T): T {
   return transformFields(data, collaborationInviteFields, encryptText);
+}
+
+export function encryptCollaborationMessageData<T extends AnyRecord>(data: T): T {
+  return transformFields(data, collaborationMessageFields, encryptText);
 }
 
 export function decryptReminderLog<T extends AnyRecord | null | undefined>(log: T): T {
@@ -131,6 +136,14 @@ export function decryptCollaborationInvite<T extends AnyRecord | null | undefine
   return decrypted;
 }
 
+export function decryptCollaborationMessage<T extends AnyRecord | null | undefined>(message: T): T {
+  return transformFields(message, collaborationMessageFields, decryptText);
+}
+
+export function decryptCollaborationMessages<T extends AnyRecord>(messages: T[]) {
+  return messages.map(decryptCollaborationMessage);
+}
+
 export function decryptCollaborationGroup<T extends AnyRecord | null | undefined>(group: T): T {
   const decrypted = transformFields(group, collaborationGroupFields, decryptText);
 
@@ -165,7 +178,8 @@ export function hasEncryptedPrivateFields(record: AnyRecord) {
     ...reminderCommentFields,
     ...aiRequestFields,
     ...collaborationGroupFields,
-    ...collaborationInviteFields
+    ...collaborationInviteFields,
+    ...collaborationMessageFields
   ]
     .some((field) => isEncryptedValue(record[field]));
 }

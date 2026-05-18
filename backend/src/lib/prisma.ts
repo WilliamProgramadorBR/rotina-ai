@@ -1,12 +1,14 @@
 import "dotenv/config";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { PrismaClient } from "../../generated/prisma/client";
 
-const connectionString = process.env.DATABASE_URL ?? "file:./dev.db";
+const connectionString = process.env.DATABASE_URL;
 
-const adapter = new PrismaBetterSqlite3({
-  url: connectionString
-});
+if (!connectionString) {
+  throw new Error("DATABASE_URL precisa estar configurado com a conexao MySQL.");
+}
+
+const adapter = new PrismaMariaDb(connectionString);
 
 export const prisma = new PrismaClient({
   adapter

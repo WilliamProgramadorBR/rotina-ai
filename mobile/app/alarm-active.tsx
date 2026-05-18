@@ -10,6 +10,7 @@ import {
 import { router, useLocalSearchParams } from "expo-router";
 import * as Notifications from "expo-notifications";
 import { useThemeMode } from "../src/context/ThemeContext";
+import { SnoozePickerModal } from "../src/components/SnoozePickerModal";
 import { scheduleSnoozeAlarm } from "../src/services/alarmNotifications";
 import { createReminderLogRequest, snoozeReminderRequest } from "../src/services/reminders";
 import { playAlarmRingtone, stopAlarmRingtone } from "../src/services/customRingtone";
@@ -68,6 +69,7 @@ export default function AlarmActiveScreen() {
   const isTestAlarm = reminderId === "test-alarm";
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSnoozePicker, setShowSnoozePicker] = useState(false);
   const handledNotificationActionRef = useRef(false);
 
   const timeLabel = useMemo(() => formatAlarmTime(startAt), [startAt]);
@@ -80,7 +82,7 @@ export default function AlarmActiveScreen() {
     };
   }, []);
 
-  async function registerAction(action: AlarmAction) {
+  async function registerAction(action: AlarmAction, minutes = 10, label?: string) {
     if (!reminderId) {
       Alert.alert("Erro", "Lembrete não identificado.");
       return;
@@ -101,10 +103,10 @@ export default function AlarmActiveScreen() {
               startAt,
               scheduleTitle
             },
-            10
+            minutes
           );
 
-          Alert.alert("Teste adiado", "Vou tocar o alarme de teste novamente em 10 minutos.");
+          Alert.alert("Teste adiado", `Vou tocar o alarme de teste novamente em ${label || `${minutes} min`}.`);
         } else {
           Alert.alert("Teste finalizado", "O alarme de teste foi encerrado.");
         }
@@ -123,15 +125,15 @@ export default function AlarmActiveScreen() {
             alarmLevel: undefined,
             schedule: scheduleTitle ? { title: scheduleTitle } : null
           },
-          10
+          minutes
         );
 
         Alert.alert(
-          result.queued ? "Soneca offline" : "Soneca ativada",
+          result.queued ? "Adiado offline" : "Tarefa adiada",
           result.queued
             ? "A soneca foi salva localmente e sera sincronizada quando a internet voltar."
             : result.alarmScheduled
-            ? "Vou te lembrar novamente em 10 minutos."
+            ? `Vou te lembrar novamente em ${label || `${minutes} min`}.`
             : "A tarefa foi adiada, mas nao consegui agendar a notificacao local."
         );
 
@@ -177,6 +179,7 @@ export default function AlarmActiveScreen() {
   }, [notificationAction]);
 
   return (
+    <>
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={[styles.glow, { backgroundColor: theme.primary, opacity: isDark ? 0.22 : 0.12 }]} />
 
@@ -221,9 +224,9 @@ export default function AlarmActiveScreen() {
           <Pressable
             style={[styles.button, { backgroundColor: theme.primarySoft, borderColor: theme.focusRing, borderWidth: 1 }]}
             disabled={isSubmitting}
-            onPress={() => registerAction("SNOOZED")}
+            onPress={() => setShowSnoozePicker(true)}
           >
-            <Text style={[styles.secondaryButtonText, { color: theme.primary }]}>Soneca 10 min</Text>
+            <Text style={[styles.secondaryButtonText, { color: theme.primary }]}>Adiar</Text>
           </Pressable>
 
           <Pressable
@@ -236,6 +239,15 @@ export default function AlarmActiveScreen() {
         </View>
       </View>
     </View>
+    <SnoozePickerModal
+      visible={showSnoozePicker}
+      onClose={() => setShowSnoozePicker(false)}
+      onConfirm={(minutes, label) => {
+        setShowSnoozePicker(false);
+        registerAction("SNOOZED", minutes, label);
+      }}
+    />
+    </>
   );
 }
 

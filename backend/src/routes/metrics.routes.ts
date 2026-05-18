@@ -9,7 +9,8 @@ import { decryptCollaborationGroups } from "../services/privateData.service";
 const userSummarySelect = {
   id: true,
   name: true,
-  email: true
+  email: true,
+  avatarUrl: true
 };
 
 export async function metricsRoutes(app: FastifyInstance) {
