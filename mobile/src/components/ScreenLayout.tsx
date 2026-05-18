@@ -1,5 +1,7 @@
 import React, { ReactNode, useState } from "react";
 import {
+  Image,
+  KeyboardAvoidingView,
   Modal,
   Pressable,
   ScrollView,
@@ -170,9 +172,13 @@ function Sidebar({ onClose, isMobile = false }: { onClose?: () => void; isMobile
       {/* Card do usuario */}
       <View style={[sidebarStyles.userCard, { backgroundColor: sidebarPanel, borderColor: isDark ? "#293246" : theme.border }]}>
         <View style={[sidebarStyles.avatar, { backgroundColor: isDark ? "#fff" : theme.primarySoft }]}>
-          <Text style={[sidebarStyles.avatarText, { color: isDark ? colors.text : theme.primary }]}>
-            {(user?.name || "U").slice(0, 1).toUpperCase()}
-          </Text>
+          {user?.avatarUrl ? (
+            <Image source={{ uri: user.avatarUrl }} style={sidebarStyles.avatarImage} />
+          ) : (
+            <Text style={[sidebarStyles.avatarText, { color: isDark ? colors.text : theme.primary }]}>
+              {(user?.name || "U").slice(0, 1).toUpperCase()}
+            </Text>
+          )}
         </View>
         <View style={sidebarStyles.userInfo}>
           <Text style={[sidebarStyles.userName, { color: sidebarText }]} numberOfLines={1}>
@@ -267,7 +273,8 @@ export function ScreenLayout({ children, scroll = true }: ScreenLayoutProps) {
   const contentPaddingH = isSmallPhone ? 12 : isPhone ? 16 : paddingHorizontal;
   const statusBarHeight = Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0;
   const topSafePadding = Math.max(insets.top, statusBarHeight);
-  const bottomSafePadding = Math.max(insets.bottom, spacing.md);
+  // spacing.xl (24px) garante margem mínima mesmo quando insets.bottom = 0
+  const bottomSafePadding = Math.max(insets.bottom, spacing.xl);
 
   const content = children({
     openMenu,
@@ -295,35 +302,41 @@ export function ScreenLayout({ children, scroll = true }: ScreenLayoutProps) {
 
       {/* Main content */}
       <View style={styles.content}>
-        {scroll ? (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={[
-              styles.scrollContent,
-              {
-                paddingHorizontal: contentPaddingH,
-                paddingTop: topSafePadding + paddingVertical,
-                paddingBottom: bottomSafePadding + spacing.xxxl
-              }
-            ]}
-          >
-            {content}
-          </ScrollView>
-        ) : (
-          <View
-            style={[
-              styles.noScrollContent,
-              {
-                paddingHorizontal: contentPaddingH,
-                paddingTop: topSafePadding + paddingVertical,
-                paddingBottom: bottomSafePadding
-              }
-            ]}
-          >
-            {content}
-          </View>
-        )}
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoiding}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={topSafePadding}
+        >
+          {scroll ? (
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={[
+                styles.scrollContent,
+                {
+                  paddingHorizontal: contentPaddingH,
+                  paddingTop: topSafePadding + paddingVertical,
+                  paddingBottom: bottomSafePadding + spacing.xxxl
+                }
+              ]}
+            >
+              {content}
+            </ScrollView>
+          ) : (
+            <View
+              style={[
+                styles.noScrollContent,
+                {
+                  paddingHorizontal: contentPaddingH,
+                  paddingTop: topSafePadding + paddingVertical,
+                  paddingBottom: bottomSafePadding
+                }
+              ]}
+            >
+              {content}
+            </View>
+          )}
+        </KeyboardAvoidingView>
       </View>
     </SafeAreaView>
   );
@@ -468,7 +481,12 @@ const sidebarStyles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "#fff",
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    overflow: "hidden"
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%"
   },
   avatarText: {
     color: colors.text,
@@ -587,6 +605,9 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     minWidth: 0
+  },
+  keyboardAvoiding: {
+    flex: 1
   },
   scrollContent: {
     width: "100%",

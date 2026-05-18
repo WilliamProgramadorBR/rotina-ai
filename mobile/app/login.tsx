@@ -13,6 +13,7 @@ import {
   useWindowDimensions
 } from "react-native";
 import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../src/context/AuthContext";
 import { colors, fonts, radius, shadow, spacing, scaledFont } from "../src/theme";
 import { useResponsive } from "../src/hooks/useResponsive";
@@ -24,6 +25,7 @@ export default function LoginScreen() {
   const { signIn } = useAuth();
   const { width, isPhone, isPhoneLarge, paddingHorizontal } = useResponsive();
   const { theme, isDark } = useThemeMode();
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -51,7 +53,7 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.root, { backgroundColor: isDark ? "#070B16" : theme.background }]}
-      behavior={Platform.select({ ios: "padding", android: undefined })}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       {/* Background Effects */}
       <View style={[styles.glowOne, isMobileLayout && styles.glowOneMobile]} />
@@ -60,7 +62,10 @@ export default function LoginScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingHorizontal: isMobileLayout ? spacing.lg : spacing.xxl }
+          {
+            paddingHorizontal: isMobileLayout ? spacing.lg : spacing.xxl,
+            paddingBottom: spacing.xxl + insets.bottom
+          }
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"

@@ -1,8 +1,6 @@
 import { useMemo, useState } from "react";
 import {
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -199,10 +197,7 @@ export default function NewScheduleScreen() {
   return (
     <ScreenLayout scroll={false}>
       {({ openMenu, isWide }) => (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.keyboardView}
-        >
+        <View style={styles.keyboardView}>
           <PageHeader
             title="Novo cronograma"
             subtitle="Monte uma rotina manual com contexto"
@@ -490,7 +485,7 @@ export default function NewScheduleScreen() {
             </Card>
           )}
           </ScrollView>
-        </KeyboardAvoidingView>
+        </View>
       )}
     </ScreenLayout>
   );

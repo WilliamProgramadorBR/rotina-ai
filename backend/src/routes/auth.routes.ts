@@ -360,7 +360,8 @@ export async function authRoutes(app: FastifyInstance) {
 
   // POST /auth/avatar — upload nativo de foto de perfil
   app.post("/avatar", {
-    preHandler: [app.authenticate]
+    preHandler: [app.authenticate],
+    bodyLimit: 6 * 1024 * 1024
   }, async (request, reply) => {
     const data = await (request as any).file({ limits: { fileSize: 5 * 1024 * 1024 } });
 

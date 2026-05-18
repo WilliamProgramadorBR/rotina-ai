@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../src/services/api";
 import { colors, fonts, radius, shadow, spacing, scaledFont } from "../src/theme";
 import { useResponsive } from "../src/hooks/useResponsive";
@@ -21,6 +22,7 @@ import { IconSymbol } from "../src/components/IconSymbol";
 export default function ForgotPasswordScreen() {
   const { width, isPhone, isPhoneLarge } = useResponsive();
   const { theme, isDark } = useThemeMode();
+  const insets = useSafeAreaInsets();
   const isMobile = isPhone || isPhoneLarge;
 
   const [email, setEmail] = useState("");
@@ -49,13 +51,13 @@ export default function ForgotPasswordScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.root, { backgroundColor: isDark ? "#070B16" : theme.background }]}
-      behavior={Platform.select({ ios: "padding", android: undefined })}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={[styles.glowOne, isMobile && styles.glowOneMobile]} />
       <View style={[styles.glowTwo, isMobile && styles.glowTwoMobile]} />
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingHorizontal: isMobile ? spacing.lg : spacing.xxl }]}
+        contentContainerStyle={[styles.scroll, { paddingHorizontal: isMobile ? spacing.lg : spacing.xxl, paddingBottom: spacing.xxl + insets.bottom }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
