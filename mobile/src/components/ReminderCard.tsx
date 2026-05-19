@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import type { GestureResponderEvent } from "react-native";
 import { colors, fonts, getCategoryMeta, getPriorityMeta, radius, shadow, spacing, scaledFont } from "../theme";
 import { useResponsive } from "../hooks/useResponsive";
 import { IconSymbol } from "./IconSymbol";
@@ -33,6 +34,7 @@ type ReminderCardProps = {
   onSnooze?: () => void;
   onSkip?: () => void;
   onReplan?: () => void;
+  onOpenDetails?: () => void;
 };
 
 function getAlarmLevelMeta(level?: string | null) {
@@ -54,7 +56,12 @@ function formatTime(value: string) {
   return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
-export function ReminderCard({ reminder, onDone, onSnooze, onSkip, onReplan }: ReminderCardProps) {
+function runCardAction(event: GestureResponderEvent, action?: () => void) {
+  event.stopPropagation();
+  action?.();
+}
+
+export function ReminderCard({ reminder, onDone, onSnooze, onSkip, onReplan, onOpenDetails }: ReminderCardProps) {
   const { width, isPhone, isSmallPhone, isPhoneLarge } = useResponsive();
   const { theme, isDark } = useThemeMode();
   const category = getCategoryMeta(reminder.schedule?.category);
@@ -68,7 +75,10 @@ export function ReminderCard({ reminder, onDone, onSnooze, onSkip, onReplan }: R
   const isMobile = isPhone || isSmallPhone || isPhoneLarge;
 
   return (
-    <View
+    <Pressable
+      disabled={!onOpenDetails}
+      onPress={onOpenDetails}
+      accessibilityRole={onOpenDetails ? "button" : undefined}
       style={[
         styles.card,
         { backgroundColor: theme.surface, borderColor: theme.border },
@@ -201,7 +211,12 @@ export function ReminderCard({ reminder, onDone, onSnooze, onSkip, onReplan }: R
         {/* Notes */}
         {reminder.notes ? (
           <View style={[styles.notesBox, { backgroundColor: theme.surfaceMuted }, isMobile && styles.notesBoxMobile]}>
-            <Text style={[styles.notesText, { color: theme.textMuted, fontSize: scaledFont(13, width) }]}>{reminder.notes}</Text>
+            <Text
+              style={[styles.notesText, { color: theme.textMuted, fontSize: scaledFont(13, width) }]}
+              numberOfLines={onOpenDetails ? 2 : undefined}
+            >
+              {reminder.notes}
+            </Text>
           </View>
         ) : null}
 
@@ -213,11 +228,23 @@ export function ReminderCard({ reminder, onDone, onSnooze, onSkip, onReplan }: R
           </View>
         ) : null}
 
+        {onOpenDetails ? (
+          <Pressable
+            onPress={(event) => runCardAction(event, onOpenDetails)}
+            style={[styles.detailsButton, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}
+          >
+            <IconSymbol name="text-box-search-outline" size={15} color={theme.primary} />
+            <Text style={[styles.detailsButtonText, { color: theme.primary, fontSize: scaledFont(12, width) }]}>
+              Ver detalhes
+            </Text>
+          </Pressable>
+        ) : null}
+
         {/* Actions */}
         <View style={[styles.actions, isMobile && styles.actionsMobile]}>
           <Pressable
             disabled={done}
-            onPress={onDone}
+            onPress={(event) => runCardAction(event, onDone)}
             style={[styles.actionButton, styles.doneButton, done && styles.actionDisabled, isMobile && styles.actionButtonMobile]}
           >
             <IconSymbol
@@ -231,7 +258,7 @@ export function ReminderCard({ reminder, onDone, onSnooze, onSkip, onReplan }: R
           </Pressable>
           <Pressable
             disabled={done || skipped}
-            onPress={onSnooze}
+            onPress={(event) => runCardAction(event, onSnooze)}
             style={[styles.actionButton, styles.snoozeButton, isMobile && styles.actionButtonMobile]}
           >
             <IconSymbol name="clock-plus-outline" size={14} color={colors.warning} />
@@ -239,7 +266,7 @@ export function ReminderCard({ reminder, onDone, onSnooze, onSkip, onReplan }: R
           </Pressable>
           {overdue && onReplan ? (
             <Pressable
-              onPress={onReplan}
+              onPress={(event) => runCardAction(event, onReplan)}
               style={[styles.actionButton, styles.replanButton, isMobile && styles.actionButtonMobile]}
             >
               <IconSymbol name="auto-fix" size={14} color={colors.accent} />
@@ -248,7 +275,7 @@ export function ReminderCard({ reminder, onDone, onSnooze, onSkip, onReplan }: R
           ) : (
             <Pressable
               disabled={done || skipped}
-              onPress={onSkip}
+              onPress={(event) => runCardAction(event, onSkip)}
               style={[styles.actionButton, styles.skipButton, isMobile && styles.actionButtonMobile]}
             >
               <IconSymbol
@@ -263,7 +290,7 @@ export function ReminderCard({ reminder, onDone, onSnooze, onSkip, onReplan }: R
           )}
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -500,6 +527,20 @@ const styles = StyleSheet.create({
 
   overdueText: {
     color: colors.danger,
+    fontFamily: fonts.bold
+  },
+  detailsButton: {
+    alignSelf: "flex-start",
+    minHeight: 34,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    marginTop: spacing.md
+  },
+  detailsButtonText: {
     fontFamily: fonts.bold
   },
 

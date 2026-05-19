@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,9 +15,9 @@ import { getDashboardMetricsRequest } from "../src/services/metrics";
 import { useAuth } from "../src/context/AuthContext";
 import { useThemeMode } from "../src/context/ThemeContext";
 import { useResponsive } from "../src/hooks/useResponsive";
-import { colors, fonts, radius, shadow, spacing, scaledFont } from "../src/theme";
+import { colors, fonts, getPriorityMeta, radius, shadow, spacing, scaledFont } from "../src/theme";
 import { formatLongDate, formatTime } from "../src/utils/date";
-import { isReminderDone, isReminderOverdue, isReminderSkipped, countOverdueReminders } from "../src/utils/reminderStatus";
+import { formatOverdueLabel, isReminderDone, isReminderOverdue, isReminderSkipped, countOverdueReminders } from "../src/utils/reminderStatus";
 import { ScreenLayout } from "../src/components/ScreenLayout";
 import { PageHeader } from "../src/components/PageHeader";
 import { IconSymbol } from "../src/components/IconSymbol";
@@ -30,6 +31,7 @@ type Reminder = {
   id: string;
   title: string;
   description?: string | null;
+  notes?: string | null;
   startAt: string;
   priority?: string | null;
   alarmLevel?: string | null;
@@ -86,6 +88,19 @@ function buildDayReorganizePrompt(reminders: Reminder[]) {
   ].join("\n");
 }
 
+function getAlarmLevelDetail(level?: string | null) {
+  switch ((level || "IMPORTANTE").toUpperCase()) {
+    case "CRITICO":
+      return { label: "Critico", color: colors.danger, bg: colors.dangerSoft, icon: "bell-alert-outline" };
+    case "LEVE":
+      return { label: "Leve", color: colors.success, bg: colors.successSoft, icon: "bell-outline" };
+    case "ROTINA":
+      return { label: "Rotina", color: "#0284C7", bg: "#E0F2FE", icon: "water-outline" };
+    default:
+      return { label: "Importante", color: colors.primary, bg: colors.primarySoft, icon: "bell-ring-outline" };
+  }
+}
+
 export default function MeuDiaScreen() {
   const { user } = useAuth();
   const { theme, isDark } = useThemeMode();
@@ -97,6 +112,7 @@ export default function MeuDiaScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isReplanning, setIsReplanning] = useState(false);
   const [snoozeTarget, setSnoozeTarget] = useState<Reminder | null>(null);
+  const [detailReminder, setDetailReminder] = useState<Reminder | null>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
 
   const loadData = useCallback(async (silent = false) => {
@@ -394,7 +410,10 @@ export default function MeuDiaScreen() {
               <Text style={[styles.sectionTitle, { color: theme.text, fontSize: scaledFont(16, width) }]}>
                 Agora
               </Text>
-              <View style={[styles.nextCard, { backgroundColor: theme.surface, borderColor: theme.primary }]}>
+              <Pressable
+                style={[styles.nextCard, { backgroundColor: theme.surface, borderColor: theme.primary }]}
+                onPress={() => setDetailReminder(nextReminder)}
+              >
                 <View style={styles.nextCardLeft}>
                   <View style={[styles.nextDot, { backgroundColor: theme.primary }]} />
                   <View>
@@ -437,7 +456,7 @@ export default function MeuDiaScreen() {
                 >
                   <IconSymbol name="play" size={18} color={theme.primary} />
                 </Pressable>
-              </View>
+              </Pressable>
             </View>
           )}
 
@@ -461,6 +480,7 @@ export default function MeuDiaScreen() {
                   onDone={() => registerAction(r.id, "DONE")}
                   onSnooze={() => registerAction(r.id, "SNOOZED")}
                   onSkip={() => registerAction(r.id, "SKIPPED")}
+                  onOpenDetails={() => setDetailReminder(r)}
                 />
               ))}
               {overdueList.length > 3 && (
@@ -520,6 +540,7 @@ export default function MeuDiaScreen() {
                   onDone={() => registerAction(r.id, "DONE")}
                   onSnooze={() => registerAction(r.id, "SNOOZED")}
                   onSkip={() => registerAction(r.id, "SKIPPED")}
+                  onOpenDetails={() => setDetailReminder(r)}
                 />
               ))}
               {reminders.length === 0 && !isLoading && (
@@ -548,14 +569,375 @@ export default function MeuDiaScreen() {
               setSnoozeTarget(null);
             }}
           />
+          <TaskDetailModal
+            reminder={detailReminder}
+            visible={detailReminder !== null}
+            onClose={() => setDetailReminder(null)}
+            onDone={() => {
+              if (detailReminder) {
+                registerAction(detailReminder.id, "DONE");
+              }
+              setDetailReminder(null);
+            }}
+            onSnooze={() => {
+              if (detailReminder) {
+                registerAction(detailReminder.id, "SNOOZED");
+              }
+              setDetailReminder(null);
+            }}
+            onSkip={() => {
+              if (detailReminder) {
+                registerAction(detailReminder.id, "SKIPPED");
+              }
+              setDetailReminder(null);
+            }}
+          />
         </View>
       )}
     </ScreenLayout>
   );
 }
 
+function TaskDetailModal({
+  reminder,
+  visible,
+  onClose,
+  onDone,
+  onSnooze,
+  onSkip
+}: {
+  reminder: Reminder | null;
+  visible: boolean;
+  onClose: () => void;
+  onDone: () => void;
+  onSnooze: () => void;
+  onSkip: () => void;
+}) {
+  const { width } = useResponsive();
+  const { theme, isDark } = useThemeMode();
+
+  if (!reminder) {
+    return null;
+  }
+
+  const done = isReminderDone(reminder);
+  const skipped = isReminderSkipped(reminder);
+  const overdue = isReminderOverdue(reminder);
+  const priority = getPriorityMeta(reminder.priority || "NORMAL");
+  const alarm = getAlarmLevelDetail(reminder.alarmLevel);
+  const description = reminder.description?.trim();
+  const notes = reminder.notes?.trim();
+
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.detailOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View style={[styles.detailSheet, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={[styles.detailHandle, { backgroundColor: theme.borderStrong }]} />
+
+          <View style={styles.detailHeader}>
+            <View style={[styles.detailIcon, { backgroundColor: overdue ? theme.dangerSoft : theme.primarySoft }]}>
+              <IconSymbol
+                name={overdue ? "alert-circle-outline" : "clipboard-text-outline"}
+                size={24}
+                color={overdue ? theme.danger : theme.primary}
+              />
+            </View>
+            <View style={styles.detailHeaderText}>
+              <Text style={[styles.detailEyebrow, { color: theme.textMuted, fontSize: scaledFont(11, width) }]}>
+                Detalhe da tarefa
+              </Text>
+              <Text style={[styles.detailTitle, { color: theme.text, fontSize: scaledFont(20, width) }]}>
+                {reminder.title}
+              </Text>
+            </View>
+            <Pressable
+              onPress={onClose}
+              style={[styles.detailClose, { backgroundColor: theme.surfaceMuted }]}
+            >
+              <IconSymbol name="close" size={20} color={theme.textMuted} />
+            </Pressable>
+          </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.detailContent}
+          >
+            <View style={styles.detailPills}>
+              <View style={[styles.detailPill, { backgroundColor: overdue ? theme.dangerSoft : theme.primarySoft }]}>
+                <IconSymbol name="clock-outline" size={13} color={overdue ? theme.danger : theme.primary} />
+                <Text style={[styles.detailPillText, { color: overdue ? theme.danger : theme.primary }]}>
+                  {formatTime(reminder.startAt)}
+                </Text>
+              </View>
+              <View style={[styles.detailPill, { backgroundColor: priority.background }]}>
+                <Text style={[styles.detailPillText, { color: priority.color }]}>
+                  {priority.label}
+                </Text>
+              </View>
+              <View style={[styles.detailPill, { backgroundColor: alarm.bg }]}>
+                <IconSymbol name={alarm.icon} size={13} color={alarm.color} />
+                <Text style={[styles.detailPillText, { color: alarm.color }]}>
+                  {alarm.label}
+                </Text>
+              </View>
+              {done ? (
+                <View style={[styles.detailPill, { backgroundColor: theme.successSoft }]}>
+                  <IconSymbol name="check-decagram" size={13} color={theme.success} />
+                  <Text style={[styles.detailPillText, { color: theme.success }]}>Concluida</Text>
+                </View>
+              ) : null}
+              {skipped ? (
+                <View style={[styles.detailPill, { backgroundColor: theme.dangerSoft }]}>
+                  <IconSymbol name="skip-next-outline" size={13} color={theme.danger} />
+                  <Text style={[styles.detailPillText, { color: theme.danger }]}>Pulada</Text>
+                </View>
+              ) : null}
+            </View>
+
+            <DetailSection
+              icon="text-box-outline"
+              title="Descricao"
+              text={description || "Sem descricao cadastrada."}
+            />
+
+            <DetailSection
+              icon="note-text-outline"
+              title="Observacoes"
+              text={notes || "Sem observacoes cadastradas."}
+              highlighted={Boolean(notes)}
+            />
+
+            {reminder.location ? (
+              <DetailSection
+                icon="map-marker-outline"
+                title="Local"
+                text={reminder.location}
+              />
+            ) : null}
+
+            {reminder.schedule?.title ? (
+              <DetailSection
+                icon="format-list-checks"
+                title="Rotina"
+                text={reminder.schedule.title}
+              />
+            ) : null}
+
+            {overdue ? (
+              <View style={[styles.detailWarning, { backgroundColor: theme.dangerSoft, borderColor: isDark ? "#4B2330" : "#FECDD6" }]}>
+                <IconSymbol name="alert-outline" size={16} color={theme.danger} />
+                <Text style={[styles.detailWarningText, { color: theme.danger, fontSize: scaledFont(12, width) }]}>
+                  {formatOverdueLabel(reminder.startAt)}
+                </Text>
+              </View>
+            ) : null}
+          </ScrollView>
+
+          <View style={[styles.detailActions, { borderColor: theme.border }]}>
+            <Pressable
+              disabled={done}
+              onPress={onDone}
+              style={[styles.detailActionButton, { backgroundColor: theme.successSoft }, done && styles.detailActionDisabled]}
+            >
+              <IconSymbol name={done ? "check-decagram" : "check"} size={15} color={theme.success} />
+              <Text style={[styles.detailActionText, { color: theme.success, fontSize: scaledFont(12, width) }]}>
+                {done ? "Feita" : "Feito"}
+              </Text>
+            </Pressable>
+            <Pressable
+              disabled={done || skipped}
+              onPress={onSnooze}
+              style={[styles.detailActionButton, { backgroundColor: theme.warningSoft }, (done || skipped) && styles.detailActionDisabled]}
+            >
+              <IconSymbol name="clock-plus-outline" size={15} color={theme.warning} />
+              <Text style={[styles.detailActionText, { color: theme.warning, fontSize: scaledFont(12, width) }]}>
+                Adiar
+              </Text>
+            </Pressable>
+            <Pressable
+              disabled={done || skipped}
+              onPress={onSkip}
+              style={[styles.detailActionButton, { backgroundColor: theme.dangerSoft }, (done || skipped) && styles.detailActionDisabled]}
+            >
+              <IconSymbol name="skip-next-outline" size={15} color={theme.danger} />
+              <Text style={[styles.detailActionText, { color: theme.danger, fontSize: scaledFont(12, width) }]}>
+                {skipped ? "Pulada" : "Pular"}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function DetailSection({
+  icon,
+  title,
+  text,
+  highlighted
+}: {
+  icon: string;
+  title: string;
+  text: string;
+  highlighted?: boolean;
+}) {
+  const { width } = useResponsive();
+  const { theme } = useThemeMode();
+
+  return (
+    <View style={[styles.detailSection, { backgroundColor: highlighted ? theme.primarySoft : theme.surfaceMuted }]}>
+      <View style={styles.detailSectionHeader}>
+        <IconSymbol name={icon} size={16} color={highlighted ? theme.primary : theme.textMuted} />
+        <Text style={[styles.detailSectionTitle, { color: highlighted ? theme.primary : theme.textMuted, fontSize: scaledFont(12, width) }]}>
+          {title}
+        </Text>
+      </View>
+      <Text style={[styles.detailSectionText, { color: theme.text, fontSize: scaledFont(14, width) }]}>
+        {text}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   page: { flex: 1, width: "100%", minWidth: 0 },
+
+  detailOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(7, 11, 22, 0.58)"
+  },
+  detailSheet: {
+    maxHeight: "86%",
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    paddingTop: spacing.sm,
+    overflow: "hidden",
+    ...shadow.medium
+  },
+  detailHandle: {
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: spacing.md
+  },
+  detailHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg
+  },
+  detailIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.lg,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  detailHeaderText: {
+    flex: 1,
+    minWidth: 0
+  },
+  detailEyebrow: {
+    fontFamily: fonts.bold,
+    textTransform: "uppercase"
+  },
+  detailTitle: {
+    fontFamily: fonts.title,
+    lineHeight: 26,
+    marginTop: 2
+  },
+  detailClose: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  detailContent: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+    gap: spacing.md
+  },
+  detailPills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm
+  },
+  detailPill: {
+    minHeight: 30,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs
+  },
+  detailPillText: {
+    fontFamily: fonts.bold,
+    fontSize: 11
+  },
+  detailSection: {
+    borderRadius: radius.lg,
+    padding: spacing.md
+  },
+  detailSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    marginBottom: spacing.sm
+  },
+  detailSectionTitle: {
+    fontFamily: fonts.bold,
+    textTransform: "uppercase"
+  },
+  detailSectionText: {
+    fontFamily: fonts.regular,
+    lineHeight: 21
+  },
+  detailWarning: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm
+  },
+  detailWarningText: {
+    flex: 1,
+    fontFamily: fonts.bold
+  },
+  detailActions: {
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: spacing.sm,
+    padding: spacing.md
+  },
+  detailActionButton: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: radius.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs
+  },
+  detailActionText: {
+    fontFamily: fonts.bold
+  },
+  detailActionDisabled: {
+    opacity: 0.56
+  },
 
   greetCard: {
     flexDirection: "row",
