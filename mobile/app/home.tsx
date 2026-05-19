@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { router, useFocusEffect } from "expo-router";
 import { api } from "../src/services/api";
 import { getDashboardMetricsRequest } from "../src/services/metrics";
@@ -16,6 +16,7 @@ import { IconSymbol } from "../src/components/IconSymbol";
 import { ShareRoutineCard } from "../src/components/ShareRoutineCard";
 import { createReminderLogRequest, snoozeReminderRequest } from "../src/services/reminders";
 import { captureAndShare } from "../src/services/shareRoutine";
+import { getUnreadCountRequest } from "../src/services/appNotifications";
 import { useResponsive } from "../src/hooks/useResponsive";
 import { useThemeMode } from "../src/context/ThemeContext";
 import {
@@ -70,7 +71,12 @@ export default function HomeScreen() {
   const [activeFilter, setActiveFilter] = useState<"ALL" | "OVERDUE" | "PENDING" | "DONE">("ALL");
   const [isSharing, setIsSharing] = useState(false);
   const [snoozeTarget, setSnoozeTarget] = useState<Reminder | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const shareCardRef = useRef<any>(null);
+
+  useEffect(() => {
+    getUnreadCountRequest().then(setUnreadCount).catch(() => {});
+  }, []);
 
   const isMobileLayout = isPhone || isSmallPhone;
   const isCompact = isPhone || isPhoneLarge;
@@ -223,12 +229,16 @@ export default function HomeScreen() {
                     { backgroundColor: theme.surface, borderColor: theme.border },
                     isSmallPhone && styles.notificationButtonSmall
                   ]}
-                  onPress={() => router.push("/settings")}
+                  onPress={() => router.push("/notifications")}
                 >
-                  <IconSymbol name="cog-outline" size={20} color={theme.text} />
-                  <View style={styles.notificationDot}>
-                    <Text style={styles.notificationDotText}>3</Text>
-                  </View>
+                  <IconSymbol name="bell-outline" size={20} color={theme.text} />
+                  {unreadCount > 0 && (
+                    <View style={styles.notificationDot}>
+                      <Text style={styles.notificationDotText}>
+                        {unreadCount > 99 ? "99+" : String(unreadCount)}
+                      </Text>
+                    </View>
+                  )}
                 </Pressable>
               </View>
             }
