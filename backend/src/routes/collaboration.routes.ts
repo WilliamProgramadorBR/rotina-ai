@@ -3,7 +3,8 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { withScheduleProgress } from "../services/metrics.service";
 import { generateScheduleSuggestion } from "../services/ai-provider.service";
-import { sendExpoPushNotificationBatch, PushPayload } from "../services/pushNotification.service";
+import { sendExpoPushNotification, sendExpoPushNotificationBatch, PushPayload } from "../services/pushNotification.service";
+import { createAppNotification, createAppNotificationBatch } from "../services/appNotification.service";
 import {
   aiSuggestRequestSchema,
   scheduleSuggestionSchema
@@ -676,6 +677,17 @@ export async function collaborationRoutes(app: FastifyInstance) {
       }
     });
 
+    // Notificar o usuário convidado (se já tiver conta) via push + in-app
+    if (invitedUser) {
+      const plainGroupName = (decryptCollaborationGroup({ name: invite.group.name }) as { name: string }).name;
+      void notifyInvitedUser({
+        invitedUserId: invitedUser.id,
+        inviterName: invite.invitedBy.name,
+        groupName: plainGroupName,
+        groupId
+      });
+    }
+
     return reply.status(201).send({
       invite: decryptCollaborationInvite(invite)
     });
@@ -1218,14 +1230,28 @@ async function sendChatPushNotifications(opts: {
   });
 
   const preview = messageText.length > 80 ? `${messageText.slice(0, 77)}...` : messageText;
-  const groupName = group.name.length > 40 ? `${group.name.slice(0, 37)}...` : group.name;
+  const rawGroupName = (decryptCollaborationGroup({ name: group.name }) as { name: string }).name;
+  const groupName = rawGroupName.length > 40 ? `${rawGroupName.slice(0, 37)}...` : rawGroupName;
 
-  const payloads: PushPayload[] = members
-    .filter((m) => {
-      if (!m.user.pushToken) return false;
-      const pref = m.user.notificationPreference;
-      return pref === null || pref.chatNotificationsEnabled !== false;
-    })
+  const eligibleMembers = members.filter((m) => {
+    const pref = m.user.notificationPreference;
+    return pref === null || pref.chatNotificationsEnabled !== false;
+  });
+
+  // In-app notifications para todos os membros elegíveis
+  await createAppNotificationBatch(
+    eligibleMembers.map((m) => ({
+      userId: m.user.id,
+      type: "CHAT_MESSAGE" as const,
+      title: `💬 ${groupName}`,
+      body: `${senderName}: ${preview}`,
+      data: { groupId }
+    }))
+  );
+
+  // Push apenas para quem tem token
+  const payloads: PushPayload[] = eligibleMembers
+    .filter((m) => !!m.user.pushToken)
     .map((m) => ({
       to: m.user.pushToken as string,
       title: `💬 ${groupName}`,
@@ -1233,8 +1259,46 @@ async function sendChatPushNotifications(opts: {
       data: {
         type: "CHAT_MESSAGE",
         groupId
-      }
+      },
+      channelId: "chat-messages"
     }));
 
   await sendExpoPushNotificationBatch(payloads);
+}
+
+async function notifyInvitedUser(opts: {
+  invitedUserId: string;
+  inviterName: string;
+  groupName: string;
+  groupId: string;
+}) {
+  const { invitedUserId, inviterName, groupName, groupId } = opts;
+
+  const title = "Convite para grupo";
+  const body = `${inviterName} convidou você para "${groupName}"`;
+
+  await createAppNotification({
+    userId: invitedUserId,
+    type: "GROUP_INVITE",
+    title,
+    body,
+    data: { groupId }
+  });
+
+  const user = await prisma.user.findUnique({
+    where: { id: invitedUserId },
+    select: { pushToken: true }
+  });
+
+  if (user?.pushToken) {
+    await sendExpoPushNotification({
+      to: user.pushToken,
+      title,
+      body,
+      data: { type: "GROUP_INVITE", groupId },
+      channelId: "group-invites",
+      sound: "default",
+      priority: "high"
+    });
+  }
 }

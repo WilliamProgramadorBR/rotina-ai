@@ -46,6 +46,8 @@ function ChatNotificationObserver() {
       const data = response.notification.request.content.data || {};
       if (data.type === "CHAT_MESSAGE" && typeof data.groupId === "string") {
         router.push(`/collaboration/${data.groupId}`);
+      } else if (data.type === "GROUP_INVITE") {
+        router.push("/collaboration");
       }
     });
 

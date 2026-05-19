@@ -4,7 +4,7 @@ import * as SecureStore from "expo-secure-store";
 
 export const TOKEN_KEY = "rotina-ai-token";
 export const API_URL_KEY = "rotina-ai-api-url";
-const SERVER_API_URL = "https://specializing-moss-asp-nominations.trycloudflare.com";
+const SERVER_API_URL = "https://husband-store-eternal-curtis.trycloudflare.com";
 
 const DEFAULT_API_URL =
   process.env.EXPO_PUBLIC_API_URL && !isLocalApiBaseUrl(process.env.EXPO_PUBLIC_API_URL)
@@ -19,6 +19,7 @@ const LEGACY_API_URLS = new Set([
   "https://occupations-minds-transformation-machinery.trycloudflare.com",
   "https://workflow-abroad-pointing-sunday.trycloudflare.com",
   "https://reliability-charger-cornwall-off.trycloudflare.com",
+  "https://specializing-moss-asp-nominations.trycloudflare.com",
   "http://localhost:3333",
   "http://127.0.0.1:3333",
   "http://0.0.0.0:3333",

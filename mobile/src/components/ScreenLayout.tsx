@@ -1,4 +1,4 @@
-import React, { ReactNode, useState } from "react";
+import React, { ReactNode, useEffect, useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
@@ -20,6 +20,7 @@ import { useResponsive } from "../hooks/useResponsive";
 import { AiBadge } from "./AiVisual";
 import { IconSymbol, IconSymbolName } from "./IconSymbol";
 import { useThemeMode } from "../context/ThemeContext";
+import { getUnreadCountRequest } from "../services/appNotifications";
 
 type ScreenLayoutProps = {
   scroll?: boolean;
@@ -46,6 +47,7 @@ const menuItems: Array<{ label: string; icon: IconSymbolName; route: string; gro
   { label: "Templates", icon: "format-list-bulleted", route: "/templates", group: "rotinas" },
   { label: "Modo Foco", icon: "timer-outline", route: "/foco", group: "ferramentas" },
   { label: "Diagnostico", icon: "bell-ring-outline", route: "/permission-diagnostics", group: "ferramentas" },
+  { label: "Notificacoes", icon: "bell-outline", route: "/notifications", group: "ferramentas" },
   { label: "Configuracoes", icon: "cog-outline", route: "/settings", group: "ferramentas" }
 ];
 
@@ -107,6 +109,15 @@ function Sidebar({ onClose, isMobile = false }: { onClose?: () => void; isMobile
   const sidebarPanel = isDark ? "#111A2E" : theme.surfaceMuted;
   const sidebarText = isDark ? "#FFFFFF" : theme.text;
   const sidebarMuted = isDark ? "#AAB4C8" : theme.textMuted;
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    getUnreadCountRequest().then(setUnreadCount).catch(() => {});
+    const timer = setInterval(() => {
+      getUnreadCountRequest().then(setUnreadCount).catch(() => {});
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   async function handleLogout() {
     try {
@@ -230,6 +241,13 @@ function Sidebar({ onClose, isMobile = false }: { onClose?: () => void; isMobile
               >
                 {item.label}
               </Text>
+              {item.route === "/notifications" && unreadCount > 0 && (
+                <View style={[sidebarStyles.notifBadge, { backgroundColor: theme.primary }]}>
+                  <Text style={sidebarStyles.notifBadgeText}>
+                    {unreadCount > 99 ? "99+" : String(unreadCount)}
+                  </Text>
+                </View>
+              )}
             </Pressable>
           );
         })}
@@ -556,6 +574,19 @@ const sidebarStyles = StyleSheet.create({
     color: "#fff",
     fontFamily: fonts.medium,
     flex: 1
+  },
+  notifBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 5
+  },
+  notifBadgeText: {
+    color: "#fff",
+    fontFamily: fonts.bold,
+    fontSize: 11
   },
   footer: {
     marginTop: spacing.md

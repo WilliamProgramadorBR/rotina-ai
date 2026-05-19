@@ -59,6 +59,11 @@ enum CollaborationInviteStatus {
   CANCELED
 }
 
+enum AppNotificationType {
+  CHAT_MESSAGE
+  GROUP_INVITE
+}
+
 model User {
   id                String    @id @default(cuid())
   name              String
@@ -84,6 +89,7 @@ model User {
   collaborationMessages        CollaborationMessage[]
   collaborationPresences       CollaborationPresence[]
   notificationPreference       NotificationPreference?
+  appNotifications             AppNotification[]
 }
 
 model NotificationPreference {
@@ -277,4 +283,19 @@ model CollaborationPresence {
 
   @@unique([groupId, userId])
   @@index([groupId, lastSeenAt])
+}
+
+model AppNotification {
+  id        String              @id @default(cuid())
+  userId    String
+  type      AppNotificationType
+  title     String              @db.VarChar(255)
+  body      String              @db.Text
+  data      String?             @db.Text
+  readAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
