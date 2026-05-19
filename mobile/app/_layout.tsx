@@ -21,7 +21,7 @@ import { ThemeProvider, useThemeMode } from "../src/context/ThemeContext";
 import { AppUpdateInstaller } from "../src/components/AppUpdateInstaller";
 import { configureAlarmNotifications } from "../src/services/alarmNotifications";
 import { openAlarmFromNotificationResponse } from "../src/services/alarmNavigation";
-import { registerPushToken, setupChatNotificationChannel } from "../src/services/pushNotifications";
+import { startPushService } from "../src/services/pushNotifications";
 import { flushOfflineQueue } from "../src/services/offlineSync";
 import { scheduleWeeklyReport } from "../src/services/weeklyReport";
 import { getDashboardMetricsRequest } from "../src/services/metrics";
@@ -37,10 +37,8 @@ function ChatNotificationObserver() {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!user) return;
-
-    setupChatNotificationChannel().catch(() => {});
-    registerPushToken().catch(() => {});
+    // Canais e token: inicia imediatamente, independente do usuário
+    const stopPushService = startPushService();
 
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data || {};
@@ -51,8 +49,11 @@ function ChatNotificationObserver() {
       }
     });
 
-    return () => subscription.remove();
-  }, [user?.id]);
+    return () => {
+      stopPushService();
+      subscription.remove();
+    };
+  }, []);
 
   return null;
 }
