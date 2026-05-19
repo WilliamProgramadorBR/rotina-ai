@@ -34,16 +34,18 @@ import { colors } from "../src/theme";
 import "../src/widgets/widgetTask";
 
 function ChatNotificationObserver() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   useEffect(() => {
     // Canais e token: inicia imediatamente, independente do usuário
-    const stopPushService = startPushService();
+    const stopPushService = startPushService({
+      registerToken: Boolean(isAuthenticated && user)
+    });
 
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data || {};
       if (data.type === "CHAT_MESSAGE" && typeof data.groupId === "string") {
-        router.push(`/collaboration/${data.groupId}`);
+        router.push(`/collaboration/${data.groupId}/chat` as any);
       } else if (data.type === "GROUP_INVITE") {
         router.push("/collaboration");
       }
@@ -53,7 +55,7 @@ function ChatNotificationObserver() {
       stopPushService();
       subscription.remove();
     };
-  }, []);
+  }, [isAuthenticated, user?.id]);
 
   return null;
 }

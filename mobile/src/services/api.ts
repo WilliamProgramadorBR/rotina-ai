@@ -40,6 +40,8 @@ const PUBLIC_ENDPOINTS = new Set([
   "/health"
 ]);
 
+const UPLOADED_AVATAR_PATH = "/uploads/avatars/";
+
 function debugApiLog(message: string, details?: unknown) {
   if (ENABLE_API_DEBUG_LOGS) {
     console.log(message, details);
@@ -86,6 +88,62 @@ function isLegacyApiBaseUrl(url: string | null) {
   if (!url) return false;
 
   return LEGACY_API_URLS.has(normalizeApiBaseUrl(url)) || isLocalApiBaseUrl(url);
+}
+
+function normalizeUploadedAvatarUrl(value: string, baseURL?: string | null) {
+  const apiBaseUrl = normalizeApiBaseUrl(baseURL || DEFAULT_API_URL);
+
+  if (value.startsWith(UPLOADED_AVATAR_PATH)) {
+    return `${apiBaseUrl}${value}`;
+  }
+
+  try {
+    const avatarUrl = new URL(value);
+
+    if (!avatarUrl.pathname.startsWith(UPLOADED_AVATAR_PATH)) {
+      return value;
+    }
+
+    const apiUrl = new URL(apiBaseUrl);
+
+    if (avatarUrl.origin === apiUrl.origin) {
+      return value;
+    }
+
+    return `${apiBaseUrl}${avatarUrl.pathname}${avatarUrl.search}`;
+  } catch {
+    return value;
+  }
+}
+
+function normalizeAvatarUrls(data: unknown, baseURL?: string | null, seen = new Set<object>()) {
+  if (!data || typeof data !== "object") {
+    return;
+  }
+
+  if (seen.has(data)) {
+    return;
+  }
+
+  seen.add(data);
+
+  if (Array.isArray(data)) {
+    data.forEach((item) => normalizeAvatarUrls(item, baseURL, seen));
+    return;
+  }
+
+  const record = data as Record<string, unknown>;
+
+  Object.keys(record).forEach((key) => {
+    const value = record[key];
+
+    if (key === "avatarUrl" && typeof value === "string") {
+      record[key] = normalizeUploadedAvatarUrl(value, baseURL);
+      return;
+    }
+
+    normalizeAvatarUrls(value, baseURL, seen);
+  });
 }
 
 function assertValidApiBaseUrl(url: string) {
@@ -378,6 +436,8 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => {
+    normalizeAvatarUrls(response.data, response.config?.baseURL);
+
     debugApiLog("[API RESPONSE]", {
       url: response.config?.url,
       method: response.config?.method,

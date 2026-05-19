@@ -6,6 +6,16 @@ import { api } from "./api";
 const CHAT_CHANNEL_ID = "chat-messages";
 const INVITE_CHANNEL_ID = "group-invites";
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    priority: Notifications.AndroidNotificationPriority.MAX
+  })
+});
+
 export async function setupChatNotificationChannel() {
   if (Platform.OS !== "android") return;
 
@@ -54,13 +64,18 @@ export async function registerPushToken(): Promise<void> {
 
 // Chama setupChatNotificationChannel + registerPushToken e mantém token
 // atualizado toda vez que o app volta ao foreground.
-export function startPushService(): () => void {
+export function startPushService(options: { registerToken?: boolean } = {}): () => void {
+  const shouldRegisterToken = options.registerToken !== false;
+
   // Configura canais imediatamente (persiste no SO mesmo com app fechado)
   setupChatNotificationChannel().catch(() => {});
-  registerPushToken().catch(() => {});
+
+  if (shouldRegisterToken) {
+    registerPushToken().catch(() => {});
+  }
 
   const sub = AppState.addEventListener("change", (state) => {
-    if (state === "active") {
+    if (state === "active" && shouldRegisterToken) {
       registerPushToken().catch(() => {});
     }
   });

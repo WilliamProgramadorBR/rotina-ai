@@ -1243,7 +1243,7 @@ async function sendChatPushNotifications(opts: {
     eligibleMembers.map((m) => ({
       userId: m.user.id,
       type: "CHAT_MESSAGE" as const,
-      title: `💬 ${groupName}`,
+      title: `Chat - ${groupName}`,
       body: `${senderName}: ${preview}`,
       data: { groupId }
     }))
@@ -1254,7 +1254,7 @@ async function sendChatPushNotifications(opts: {
     .filter((m) => !!m.user.pushToken)
     .map((m) => ({
       to: m.user.pushToken as string,
-      title: `💬 ${groupName}`,
+      title: `Chat - ${groupName}`,
       body: `${senderName}: ${preview}`,
       data: {
         type: "CHAT_MESSAGE",

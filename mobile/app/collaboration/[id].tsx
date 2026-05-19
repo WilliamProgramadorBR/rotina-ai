@@ -1,20 +1,20 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { PageHeader } from "../../src/components/PageHeader";
 import { ScreenLayout } from "../../src/components/ScreenLayout";
 import { Badge, Button, Card, EmptyState, Input, LoadingState } from "../../src/components/ui";
 import { ScheduleCard } from "../../src/components/ScheduleCard";
 import { IconSymbol } from "../../src/components/IconSymbol";
-import { CollaborationGroup, CollaborationMessage, CollaborationPresence } from "../../src/types/entities";
+import { CollaborationUserAvatar } from "../../src/components/collaboration/CollaborationUserAvatar";
+import { CollaborationGroup, CollaborationPresence } from "../../src/types/entities";
 import {
   createCollaborationScheduleFromSuggestionRequest,
   createCollaborationScheduleRequest,
   getCollaborationGroupRequest,
   inviteCollaborationMemberRequest,
-  listCollaborationMessagesRequest,
   leaveCollaborationGroupRequest,
-  sendCollaborationMessageRequest,
+  pingCollaborationPresenceRequest,
   suggestCollaborationScheduleRequest
 } from "../../src/services/collaboration";
 import { fonts, radius, spacing, scaledFont } from "../../src/theme";
@@ -28,18 +28,6 @@ function getTodayDate() {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function getInitials(name?: string | null) {
-  const initials = String(name || "")
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.charAt(0))
-    .join("")
-    .toUpperCase();
-
-  return initials || "?";
 }
 
 function formatMessageTime(value: string) {
@@ -78,30 +66,41 @@ function formatLastSeen(value?: string | null) {
   return formatMessageTime(value);
 }
 
+function arePresenceEqual(current: CollaborationPresence[], next: CollaborationPresence[]) {
+  if (current.length !== next.length) return false;
+
+  return current.every((item, index) => {
+    const nextItem = next[index];
+
+    return (
+      item.userId === nextItem.userId &&
+      item.status === nextItem.status &&
+      item.lastSeenAt === nextItem.lastSeenAt &&
+      item.user?.name === nextItem.user?.name &&
+      item.user?.avatarUrl === nextItem.user?.avatarUrl
+    );
+  });
+}
+
 export default function CollaborationDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const groupId = String(params.id || "");
   const { width, isPhone, isSmallPhone } = useResponsive();
   const { theme } = useThemeMode();
   const { user } = useAuth();
-  const chatScrollRef = useRef<ScrollView | null>(null);
   const [group, setGroup] = useState<CollaborationGroup | null>(null);
-  const [messages, setMessages] = useState<CollaborationMessage[]>([]);
   const [presence, setPresence] = useState<CollaborationPresence[]>([]);
   const [onlineCount, setOnlineCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isChatLoading, setIsChatLoading] = useState(true);
   const [email, setEmail] = useState("");
   const [inviteMessage, setInviteMessage] = useState("");
   const [scheduleTitle, setScheduleTitle] = useState("");
   const [scheduleDescription, setScheduleDescription] = useState("");
   const [aiPrompt, setAiPrompt] = useState("");
-  const [messageText, setMessageText] = useState("");
   const [isInviting, setIsInviting] = useState(false);
   const [isCreatingSchedule, setIsCreatingSchedule] = useState(false);
   const [isCreatingWithAi, setIsCreatingWithAi] = useState(false);
-  const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
 
   const isMobile = isPhone || isSmallPhone;
@@ -121,34 +120,30 @@ export default function CollaborationDetailScreen() {
     }
   }, [groupId]);
 
-  const loadRoom = useCallback(async (silent = false) => {
+  const loadPresence = useCallback(async () => {
     if (!groupId) return;
 
     try {
-      if (!silent) setIsChatLoading(true);
-      const room = await listCollaborationMessagesRequest(groupId);
-      setMessages(room.messages);
-      setPresence(room.presence);
-      setOnlineCount(room.onlineCount);
-    } catch (error: any) {
-      if (!silent) {
-        Alert.alert("Erro", error?.response?.data?.message || "Nao foi possivel carregar o chat da equipe.");
-      }
-    } finally {
-      setIsChatLoading(false);
+      const roomPresence = await pingCollaborationPresenceRequest(groupId);
+      setPresence((current) => (
+        arePresenceEqual(current, roomPresence.presence) ? current : roomPresence.presence
+      ));
+      setOnlineCount(roomPresence.onlineCount);
+    } catch {
+      // Presenca e um detalhe visual; a tela do grupo continua utilizavel sem ela.
     }
   }, [groupId]);
 
   useFocusEffect(useCallback(() => {
     loadGroup();
-    loadRoom();
+    loadPresence();
 
     const interval = setInterval(() => {
-      loadRoom(true);
-    }, 12_000);
+      loadPresence();
+    }, 30_000);
 
     return () => clearInterval(interval);
-  }, [loadGroup, loadRoom]));
+  }, [loadGroup, loadPresence]));
 
   const stats = useMemo(() => {
     const schedules = group?.schedules || [];
@@ -168,6 +163,33 @@ export default function CollaborationDetailScreen() {
   const presenceByUserId = useMemo(() => {
     return new Map(presence.map((item) => [item.userId, item]));
   }, [presence]);
+
+  const previewPresence = useMemo(() => (
+    presence.length > 0
+      ? presence
+      : (group?.members || []).map((member) => ({
+        id: member.id,
+        groupId,
+        userId: member.userId,
+        lastSeenAt: null,
+        status: "OFFLINE" as const,
+        user: member.user,
+        isCurrentUser: member.userId === user?.id
+      }))
+  ), [group?.members, groupId, presence, user?.id]);
+
+  async function handleRefresh() {
+    setIsRefreshing(true);
+
+    try {
+      await Promise.all([
+        loadGroup(true),
+        loadPresence()
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
 
   async function handleInvite() {
     try {
@@ -239,37 +261,6 @@ export default function CollaborationDetailScreen() {
     }
   }
 
-  async function handleSendMessage() {
-    const text = messageText.trim();
-
-    if (!text) {
-      return;
-    }
-
-    try {
-      setIsSendingMessage(true);
-      const room = await sendCollaborationMessageRequest(groupId, {
-        message: text
-      });
-
-      setMessageText("");
-      setMessages((current) => [
-        ...current.filter((message) => message.id !== room.message.id),
-        room.message
-      ]);
-      setPresence(room.presence);
-      setOnlineCount(room.onlineCount);
-
-      setTimeout(() => {
-        chatScrollRef.current?.scrollToEnd({ animated: true });
-      }, 80);
-    } catch (error: any) {
-      Alert.alert("Erro", error?.response?.data?.message || "Nao foi possivel enviar a mensagem.");
-    } finally {
-      setIsSendingMessage(false);
-    }
-  }
-
   function handleLeaveGroup() {
     if (!group) return;
 
@@ -299,15 +290,21 @@ export default function CollaborationDetailScreen() {
   }
 
   return (
-    <ScreenLayout>
+    <ScreenLayout scroll={false}>
       {({ openMenu, isWide }) => (
-        <View>
+        <View style={styles.screen}>
           <PageHeader
             title={group?.name || "Grupo"}
             subtitle={group?.description || "Rotina compartilhada com tarefas em conjunto"}
             onMenu={isWide ? undefined : openMenu}
             right={
               <View style={styles.headerActions}>
+                <Button
+                  title={isMobile ? "Chat" : "Abrir chat"}
+                  icon="message-text-outline"
+                  size="sm"
+                  onPress={() => router.push(`/collaboration/${groupId}/chat` as any)}
+                />
                 <Button
                   title={isMobile ? "Voltar" : "Grupos"}
                   icon="arrow-left"
@@ -339,14 +336,12 @@ export default function CollaborationDetailScreen() {
             />
           ) : (
             <ScrollView
+              style={styles.pageScroll}
               showsVerticalScrollIndicator={false}
               refreshControl={
                 <RefreshControl
                   refreshing={isRefreshing}
-                  onRefresh={() => {
-                    setIsRefreshing(true);
-                    loadGroup(true);
-                  }}
+                  onRefresh={handleRefresh}
                 />
               }
               contentContainerStyle={styles.content}
@@ -358,23 +353,25 @@ export default function CollaborationDetailScreen() {
                 <Stat label="Feitas" value={stats.done} icon="check-circle-outline" />
               </View>
 
-              <Card style={styles.roomCard}>
-                <View style={styles.roomHeader}>
-                  <View style={[styles.roomIcon, { backgroundColor: theme.primarySoft }]}>
+              <Card style={styles.chatPreviewCard}>
+                <View style={styles.chatPreviewHeader}>
+                  <View style={[styles.chatPreviewIcon, { backgroundColor: theme.primarySoft }]}>
                     <IconSymbol name="message-text-outline" size={22} color={theme.primary} />
                   </View>
-                  <View style={styles.roomTitleBox}>
+                  <View style={styles.chatPreviewTitleBox}>
                     <Text style={[styles.panelTitle, { color: theme.text, fontSize: scaledFont(18, width) }]}>
-                      Chat da equipe
+                      Chat do grupo
                     </Text>
                     <Text style={[styles.panelSubtitle, { color: theme.textMuted }]}>
-                      {onlineCount} online agora
+                      {onlineCount} online agora em uma conversa dedicada.
                     </Text>
                   </View>
-                  <View style={[styles.liveBadge, { backgroundColor: theme.successSoft }]}>
-                    <View style={[styles.liveDot, { backgroundColor: theme.success }]} />
-                    <Text style={[styles.liveText, { color: theme.success }]}>ao vivo</Text>
-                  </View>
+                  <Button
+                    title={isMobile ? "Abrir" : "Abrir chat"}
+                    icon="open-in-new"
+                    size="sm"
+                    onPress={() => router.push(`/collaboration/${groupId}/chat` as any)}
+                  />
                 </View>
 
                 <ScrollView
@@ -382,25 +379,20 @@ export default function CollaborationDetailScreen() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.presenceStrip}
                 >
-                  {(presence.length > 0 ? presence : (group.members || []).map((member) => ({
-                    id: member.id,
-                    groupId,
-                    userId: member.userId,
-                    lastSeenAt: null,
-                    status: "OFFLINE" as const,
-                    user: member.user,
-                    isCurrentUser: member.userId === user?.id
-                  }))).map((item) => {
+                  {previewPresence.map((item) => {
                     const isOnline = item.status === "ONLINE";
 
                     return (
                       <View key={item.userId} style={[styles.presencePill, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
-                        <View style={[styles.avatar, { backgroundColor: isOnline ? theme.successSoft : theme.surface, borderColor: isOnline ? theme.success : theme.border }]}>
-                          <Text style={[styles.avatarText, { color: isOnline ? theme.success : theme.textMuted }]}>
-                            {getInitials(item.user?.name)}
-                          </Text>
-                          <View style={[styles.statusDot, { backgroundColor: isOnline ? theme.success : theme.textSoft, borderColor: theme.surfaceMuted }]} />
-                        </View>
+                        <CollaborationUserAvatar
+                          user={item.user}
+                          size={38}
+                          backgroundColor={isOnline ? theme.successSoft : theme.surface}
+                          borderColor={isOnline ? theme.success : theme.border}
+                          textColor={isOnline ? theme.success : theme.textMuted}
+                          statusColor={isOnline ? theme.success : theme.textSoft}
+                          statusBorderColor={theme.surfaceMuted}
+                        />
                         <View style={styles.presenceTextBox}>
                           <Text style={[styles.presenceName, { color: theme.text }]} numberOfLines={1}>
                             {item.isCurrentUser ? "Voce" : item.user?.name || "Membro"}
@@ -413,101 +405,6 @@ export default function CollaborationDetailScreen() {
                     );
                   })}
                 </ScrollView>
-
-                <View style={[styles.chatFeed, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
-                  {isChatLoading ? (
-                    <View style={styles.chatLoading}>
-                      <ActivityIndicator color={theme.primary} />
-                      <Text style={[styles.chatLoadingText, { color: theme.textMuted }]}>Abrindo conversa...</Text>
-                    </View>
-                  ) : messages.length === 0 ? (
-                    <View style={styles.emptyChat}>
-                      <IconSymbol name="chat-plus-outline" size={24} color={theme.primary} />
-                      <Text style={[styles.emptyChatTitle, { color: theme.text }]}>Comece a conversa</Text>
-                      <Text style={[styles.emptyChatText, { color: theme.textMuted }]}>
-                        Combine prazos, divida tarefas e mantenha todo mundo no mesmo ritmo.
-                      </Text>
-                    </View>
-                  ) : (
-                    <ScrollView
-                      ref={chatScrollRef}
-                      nestedScrollEnabled
-                      showsVerticalScrollIndicator={false}
-                      style={styles.chatMessagesScroll}
-                      contentContainerStyle={styles.chatMessages}
-                      onContentSizeChange={() => chatScrollRef.current?.scrollToEnd({ animated: false })}
-                    >
-                      {messages.map((message) => {
-                        const isMine = Boolean(message.isMine || message.userId === user?.id);
-
-                        return (
-                          <View key={message.id} style={[styles.messageRow, isMine && styles.messageRowMine]}>
-                            {!isMine ? (
-                              <View style={[styles.messageAvatar, { backgroundColor: theme.primarySoft }]}>
-                                <Text style={[styles.messageAvatarText, { color: theme.primary }]}>
-                                  {getInitials(message.user?.name)}
-                                </Text>
-                              </View>
-                            ) : null}
-                            <View style={[
-                              styles.messageBubble,
-                              {
-                                backgroundColor: isMine ? theme.primary : theme.surface,
-                                borderColor: isMine ? theme.primary : theme.border
-                              }
-                            ]}>
-                              <View style={styles.messageMeta}>
-                                <Text style={[styles.messageAuthor, { color: isMine ? theme.white : theme.text }]} numberOfLines={1}>
-                                  {isMine ? "Voce" : message.user?.name || "Membro"}
-                                </Text>
-                                <Text style={[styles.messageTime, { color: isMine ? "rgba(255,255,255,0.76)" : theme.textMuted }]}>
-                                  {formatMessageTime(message.createdAt)}
-                                </Text>
-                              </View>
-                              <Text style={[styles.messageBody, { color: isMine ? theme.white : theme.text }]}>
-                                {message.message}
-                              </Text>
-                            </View>
-                          </View>
-                        );
-                      })}
-                    </ScrollView>
-                  )}
-                </View>
-
-                <View style={styles.composer}>
-                  <TextInput
-                    value={messageText}
-                    onChangeText={setMessageText}
-                    placeholder="Mensagem para a equipe"
-                    placeholderTextColor={theme.textSoft}
-                    multiline
-                    style={[
-                      styles.composerInput,
-                      {
-                        backgroundColor: theme.surface,
-                        borderColor: theme.borderStrong,
-                        color: theme.text
-                      }
-                    ]}
-                  />
-                  <Pressable
-                    onPress={handleSendMessage}
-                    disabled={isSendingMessage || !messageText.trim()}
-                    style={({ pressed }) => [
-                      styles.sendButton,
-                      { backgroundColor: theme.primary },
-                      pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 },
-                      (isSendingMessage || !messageText.trim()) && { opacity: 0.55 }
-                    ]}
-                  >
-                    {isSendingMessage ? (
-                      <ActivityIndicator color={theme.white} />
-                    ) : (
-                      <IconSymbol name="send" size={20} color={theme.white} />
-                    )}
-                  </Pressable>
-                </View>
               </Card>
 
               <Card>
@@ -593,20 +490,27 @@ export default function CollaborationDetailScreen() {
               <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>Membros</Text>
                 <View style={styles.members}>
-                  {(group.members || []).map((member) => (
-                    <View key={member.id} style={[styles.memberPill, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                      <View style={[
-                        styles.memberStatusDot,
-                        {
-                          backgroundColor: presenceByUserId.get(member.userId)?.status === "ONLINE" ? theme.success : theme.textSoft
-                        }
-                      ]} />
-                      <Text style={[styles.memberName, { color: theme.text }]} numberOfLines={1}>
-                        {member.user.name}
-                      </Text>
-                      <Badge text={member.role === "OWNER" ? "dono" : member.role.toLowerCase()} />
-                    </View>
-                  ))}
+                  {(group.members || []).map((member) => {
+                    const isOnline = presenceByUserId.get(member.userId)?.status === "ONLINE";
+
+                    return (
+                      <View key={member.id} style={[styles.memberPill, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                        <CollaborationUserAvatar
+                          user={member.user}
+                          size={30}
+                          backgroundColor={isOnline ? theme.successSoft : theme.surfaceMuted}
+                          borderColor={isOnline ? theme.success : theme.border}
+                          textColor={isOnline ? theme.success : theme.textMuted}
+                          statusColor={isOnline ? theme.success : theme.textSoft}
+                          statusBorderColor={theme.surface}
+                        />
+                        <Text style={[styles.memberName, { color: theme.text }]} numberOfLines={1}>
+                          {member.user.name}
+                        </Text>
+                        <Badge text={member.role === "OWNER" ? "dono" : member.role.toLowerCase()} />
+                      </View>
+                    );
+                  })}
                 </View>
               </View>
 
@@ -616,7 +520,7 @@ export default function CollaborationDetailScreen() {
                   <EmptyState
                     iconName="format-list-checks"
                     title="Nenhuma rotina compartilhada"
-                    description="Crie uma rotina manual ou peça para a IA montar um plano do grupo."
+                    description="Crie uma rotina manual ou peca para a IA montar um plano do grupo."
                   />
                 ) : (
                   (group.schedules || []).map((schedule) => (
@@ -650,6 +554,12 @@ function Stat({ label, value, icon }: { label: string; value: number; icon: stri
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1
+  },
+  pageScroll: {
+    flex: 1
+  },
   content: {
     paddingBottom: spacing.xxxl,
     gap: spacing.lg
@@ -657,6 +567,8 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
     gap: spacing.sm
   },
   statsGrid: {
@@ -691,42 +603,25 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     marginTop: spacing.sm
   },
-  roomCard: {
+  chatPreviewCard: {
     gap: spacing.lg,
     padding: spacing.lg
   },
-  roomHeader: {
+  chatPreviewHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md
   },
-  roomIcon: {
+  chatPreviewIcon: {
     width: 46,
     height: 46,
     borderRadius: radius.lg,
     alignItems: "center",
     justifyContent: "center"
   },
-  roomTitleBox: {
+  chatPreviewTitleBox: {
     flex: 1,
     minWidth: 0
-  },
-  liveBadge: {
-    minHeight: 30,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4
-  },
-  liveText: {
-    fontFamily: fonts.bold,
-    fontSize: 11
   },
   presenceStrip: {
     gap: spacing.sm,
@@ -743,27 +638,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.sm
   },
-  avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  avatarText: {
-    fontFamily: fonts.title,
-    fontSize: 13
-  },
-  statusDot: {
-    position: "absolute",
-    right: -1,
-    bottom: -1,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2
-  },
   presenceTextBox: {
     flex: 1,
     minWidth: 0
@@ -776,117 +650,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     fontSize: 11,
     marginTop: 2
-  },
-  chatFeed: {
-    height: 300,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    overflow: "hidden"
-  },
-  chatMessagesScroll: {
-    flex: 1
-  },
-  chatMessages: {
-    padding: spacing.md,
-    gap: spacing.md
-  },
-  chatLoading: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm
-  },
-  chatLoadingText: {
-    fontFamily: fonts.medium,
-    fontSize: 13
-  },
-  emptyChat: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: spacing.xl
-  },
-  emptyChatTitle: {
-    fontFamily: fonts.title,
-    fontSize: 17,
-    marginTop: spacing.sm
-  },
-  emptyChatText: {
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    lineHeight: 19,
-    textAlign: "center",
-    marginTop: spacing.xs
-  },
-  messageRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: spacing.sm
-  },
-  messageRowMine: {
-    justifyContent: "flex-end"
-  },
-  messageAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  messageAvatarText: {
-    fontFamily: fonts.title,
-    fontSize: 10
-  },
-  messageBubble: {
-    maxWidth: "82%",
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: spacing.md
-  },
-  messageMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    marginBottom: spacing.xs
-  },
-  messageAuthor: {
-    flex: 1,
-    fontFamily: fonts.bold,
-    fontSize: 12
-  },
-  messageTime: {
-    fontFamily: fonts.medium,
-    fontSize: 10
-  },
-  messageBody: {
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    lineHeight: 20
-  },
-  composer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: spacing.sm
-  },
-  composerInput: {
-    flex: 1,
-    minHeight: 48,
-    maxHeight: 110,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlignVertical: "top"
-  },
-  sendButton: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.lg,
-    alignItems: "center",
-    justifyContent: "center"
   },
   panelHeader: {
     flexDirection: "row",
@@ -917,18 +680,14 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   memberPill: {
-    minHeight: 42,
+    minHeight: 44,
     borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm
-  },
-  memberStatusDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5
   },
   memberName: {
     maxWidth: 150,

@@ -46,12 +46,19 @@ export async function leaveCollaborationGroupRequest(groupId: string) {
   return data;
 }
 
-export async function listCollaborationMessagesRequest(groupId: string) {
+export async function listCollaborationMessagesRequest(
+  groupId: string,
+  options: { limit?: number } = {}
+) {
   const { data } = await api.get<{
     messages: CollaborationMessage[];
     presence: CollaborationPresence[];
     onlineCount: number;
-  }>(`/collaboration/groups/${groupId}/chat`);
+  }>(`/collaboration/groups/${groupId}/chat`, {
+    params: {
+      limit: options.limit
+    }
+  });
   return data;
 }
 
