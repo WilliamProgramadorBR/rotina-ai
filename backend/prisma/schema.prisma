@@ -90,6 +90,7 @@ model User {
   collaborationPresences       CollaborationPresence[]
   notificationPreference       NotificationPreference?
   appNotifications             AppNotification[]
+  aiDailyInsights              AiDailyInsight[]
 }
 
 model NotificationPreference {
@@ -298,4 +299,18 @@ model AppNotification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+}
+
+model AiDailyInsight {
+  id           String   @id @default(cuid())
+  userId       String
+  date         String   @db.VarChar(10)
+  insightsJson String   @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
 }

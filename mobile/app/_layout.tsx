@@ -18,6 +18,7 @@ import { Manrope_800ExtraBold } from "@expo-google-fonts/manrope";
 
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
 import { ThemeProvider, useThemeMode } from "../src/context/ThemeContext";
+import { AppAlertProvider } from "../src/components/AppAlertProvider";
 import { AppUpdateInstaller } from "../src/components/AppUpdateInstaller";
 import { configureAlarmNotifications } from "../src/services/alarmNotifications";
 import { openAlarmFromNotificationResponse } from "../src/services/alarmNavigation";
@@ -208,7 +209,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <RootLayoutContent />
+        <AppAlertProvider>
+          <RootLayoutContent />
+        </AppAlertProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

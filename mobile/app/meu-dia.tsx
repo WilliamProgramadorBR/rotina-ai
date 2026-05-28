@@ -383,16 +383,17 @@ export default function MeuDiaScreen() {
                 { backgroundColor: theme.surface, borderColor: theme.border, borderWidth: 1, flex: 1 }
               ]}
               onPress={() => {
-                if (!nextReminder) {
+                const focusTarget = nextReminder || overdueList[0] || null;
+                if (!focusTarget) {
                   Alert.alert("Modo Foco", "Não há atividades pendentes para iniciar o foco.");
                   return;
                 }
                 router.push({
                   pathname: "/foco",
                   params: {
-                    reminderId: nextReminder.id,
-                    title: nextReminder.title,
-                    description: nextReminder.description || ""
+                    reminderId: focusTarget.id,
+                    title: focusTarget.title,
+                    description: focusTarget.description || ""
                   }
                 });
               }}

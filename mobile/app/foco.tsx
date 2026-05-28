@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import { Alert, Animated, Pressable, StyleSheet, Text, View } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { api } from "../src/services/api";
 import { createReminderLogRequest } from "../src/services/reminders";
 import { colors, fonts, radius, shadow, spacing, scaledFont } from "../src/theme";
 import { useThemeMode } from "../src/context/ThemeContext";
@@ -8,10 +9,20 @@ import { useResponsive } from "../src/hooks/useResponsive";
 import { ScreenLayout } from "../src/components/ScreenLayout";
 import { PageHeader } from "../src/components/PageHeader";
 import { IconSymbol } from "../src/components/IconSymbol";
+import { isReminderDone, isReminderSkipped, isReminderOverdue, formatOverdueLabel } from "../src/utils/reminderStatus";
+import { formatTime } from "../src/utils/date";
 
 type FocusMode = "POMODORO" | "LIVRE";
 
 const POMODORO_SECONDS = 25 * 60;
+
+type TaskOption = {
+  id: string;
+  title: string;
+  description?: string | null;
+  startAt: string;
+  overdue: boolean;
+};
 
 export default function FocoScreen() {
   const { theme, isDark } = useThemeMode();
@@ -27,8 +38,41 @@ export default function FocoScreen() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  const [selectedId, setSelectedId] = useState<string | undefined>(params.reminderId);
+  const [selectedTitle, setSelectedTitle] = useState<string | undefined>(params.title);
+  const [selectedDescription, setSelectedDescription] = useState<string | undefined>(params.description);
+  const [taskOptions, setTaskOptions] = useState<TaskOption[]>([]);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false);
+  const [taskPickerVisible, setTaskPickerVisible] = useState(false);
+
   const elapsed = totalSeconds - remaining;
   const progress = totalSeconds > 0 ? elapsed / totalSeconds : 0;
+
+  useFocusEffect(useCallback(() => {
+    loadTaskOptions();
+  }, []));
+
+  async function loadTaskOptions() {
+    try {
+      setIsLoadingTasks(true);
+      const res = await api.get("/reminders/today");
+      const reminders: any[] = res.data.reminders || [];
+      const options: TaskOption[] = reminders
+        .filter((r) => !isReminderDone(r) && !isReminderSkipped(r))
+        .map((r) => ({
+          id: r.id,
+          title: r.title,
+          description: r.description,
+          startAt: r.startAt,
+          overdue: isReminderOverdue(r)
+        }));
+      setTaskOptions(options);
+    } catch {
+      // silently ignore — task picker will just be empty
+    } finally {
+      setIsLoadingTasks(false);
+    }
+  }
 
   useEffect(() => {
     if (mode === "POMODORO") {
@@ -87,9 +131,9 @@ export default function FocoScreen() {
   async function handleFinish() {
     setIsRunning(false);
     setIsFinished(true);
-    if (params.reminderId) {
+    if (selectedId) {
       try {
-        const result = await createReminderLogRequest(params.reminderId, {
+        const result = await createReminderLogRequest(selectedId, {
           action: "DONE",
           note: `Concluído via Modo Foco (${mode === "POMODORO" ? "Pomodoro 25min" : `${customMinutes}min livre`}).`
         });
@@ -136,6 +180,13 @@ export default function FocoScreen() {
     );
   }
 
+  function handleSelectTask(task: TaskOption) {
+    setSelectedId(task.id);
+    setSelectedTitle(task.title);
+    setSelectedDescription(task.description || undefined);
+    setTaskPickerVisible(false);
+  }
+
   const circumference = 2 * Math.PI * 100;
   const strokeDashoffset = circumference * (1 - progress);
 
@@ -151,7 +202,7 @@ export default function FocoScreen() {
         <View style={styles.page}>
           <PageHeader
             title="Modo Foco"
-            subtitle={params.title || "Timer de foco"}
+            subtitle={selectedTitle || "Timer de foco"}
             onMenu={isWide ? undefined : openMenu}
             right={
               <Pressable
@@ -213,6 +264,45 @@ export default function FocoScreen() {
             </View>
           )}
 
+          {/* Seletor de tarefa */}
+          {!isRunning && !isFinished && (
+            <Pressable
+              style={[styles.taskSelector, { backgroundColor: theme.surface, borderColor: selectedId ? theme.primary : theme.border }]}
+              onPress={() => setTaskPickerVisible(true)}
+            >
+              <View style={styles.taskSelectorLeft}>
+                <IconSymbol
+                  name={selectedId ? "checkbox-marked-circle-outline" : "plus-circle-outline"}
+                  size={20}
+                  color={selectedId ? theme.primary : theme.textMuted}
+                />
+                <View style={styles.taskSelectorText}>
+                  {selectedTitle ? (
+                    <>
+                      <Text style={[styles.taskSelectorLabel, { color: theme.textMuted, fontSize: scaledFont(11, width) }]}>
+                        Tarefa
+                      </Text>
+                      <Text style={[styles.taskSelectorTitle, { color: theme.text, fontSize: scaledFont(14, width) }]} numberOfLines={1}>
+                        {selectedTitle}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={[styles.taskSelectorTitle, { color: theme.textMuted, fontSize: scaledFont(14, width) }]}>
+                      Selecionar tarefa (opcional)
+                    </Text>
+                  )}
+                </View>
+              </View>
+              <View style={styles.taskSelectorRight}>
+                {isLoadingTasks ? (
+                  <ActivityIndicator size="small" color={theme.textMuted} />
+                ) : (
+                  <IconSymbol name="chevron-right" size={16} color={theme.textMuted} />
+                )}
+              </View>
+            </Pressable>
+          )}
+
           {/* Timer circular */}
           <View style={styles.timerContainer}>
             <Animated.View style={[styles.timerOuter, { transform: [{ scale: pulseAnim }] }]}>
@@ -232,9 +322,9 @@ export default function FocoScreen() {
                   <Text style={[styles.timerLabel, { color: theme.textMuted, fontSize: scaledFont(13, width) }]}>
                     {isFinished ? "Concluído!" : isRunning ? "Em foco..." : "Pronto para começar"}
                   </Text>
-                  {params.title ? (
+                  {selectedTitle ? (
                     <Text style={[styles.timerTask, { color: theme.text, fontSize: scaledFont(14, width) }]} numberOfLines={1}>
-                      {params.title}
+                      {selectedTitle}
                     </Text>
                   ) : null}
                 </View>
@@ -316,9 +406,106 @@ export default function FocoScreen() {
               </Text>
             </View>
           )}
+
+          {/* Modal seletor de tarefas */}
+          <TaskPickerModal
+            visible={taskPickerVisible}
+            tasks={taskOptions}
+            selectedId={selectedId}
+            onSelect={handleSelectTask}
+            onClose={() => setTaskPickerVisible(false)}
+            isDark={isDark}
+            theme={theme}
+            width={width}
+          />
         </View>
       )}
     </ScreenLayout>
+  );
+}
+
+function TaskPickerModal({
+  visible,
+  tasks,
+  selectedId,
+  onSelect,
+  onClose,
+  isDark,
+  theme,
+  width
+}: {
+  visible: boolean;
+  tasks: TaskOption[];
+  selectedId?: string;
+  onSelect: (task: TaskOption) => void;
+  onClose: () => void;
+  isDark: boolean;
+  theme: any;
+  width: number;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <Pressable
+          style={[styles.modalSheet, { backgroundColor: theme.background }]}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <View style={[styles.modalHandle, { backgroundColor: theme.border }]} />
+          <View style={styles.modalHeader}>
+            <Text style={[styles.modalTitle, { color: theme.text, fontSize: scaledFont(16, width) }]}>
+              Selecionar tarefa
+            </Text>
+            <Pressable onPress={onClose} style={[styles.modalCloseBtn, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <IconSymbol name="close" size={16} color={theme.textMuted} />
+            </Pressable>
+          </View>
+
+          {tasks.length === 0 ? (
+            <View style={styles.modalEmpty}>
+              <IconSymbol name="check-all" size={32} color={theme.textSoft} />
+              <Text style={[styles.modalEmptyText, { color: theme.textMuted, fontSize: scaledFont(14, width) }]}>
+                Todas as atividades de hoje foram concluídas!
+              </Text>
+            </View>
+          ) : (
+            <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
+              {tasks.map((task) => (
+                <Pressable
+                  key={task.id}
+                  style={[
+                    styles.taskItem,
+                    { backgroundColor: theme.surface, borderColor: task.id === selectedId ? theme.primary : theme.border },
+                    task.id === selectedId && { borderColor: theme.primary }
+                  ]}
+                  onPress={() => onSelect(task)}
+                >
+                  <View style={styles.taskItemLeft}>
+                    <View style={[
+                      styles.taskItemDot,
+                      { backgroundColor: task.overdue ? colors.danger : theme.primary }
+                    ]} />
+                    <View style={styles.taskItemText}>
+                      <Text style={[styles.taskItemTitle, { color: theme.text, fontSize: scaledFont(14, width) }]} numberOfLines={2}>
+                        {task.title}
+                      </Text>
+                      <View style={styles.taskItemMeta}>
+                        <IconSymbol name="clock-outline" size={12} color={theme.textSoft} />
+                        <Text style={[styles.taskItemTime, { color: task.overdue ? colors.danger : theme.textMuted, fontSize: scaledFont(12, width) }]}>
+                          {task.overdue ? formatOverdueLabel(task.startAt) : formatTime(task.startAt)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  {task.id === selectedId && (
+                    <IconSymbol name="check-circle" size={20} color={theme.primary} />
+                  )}
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -371,6 +558,22 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   durationChipText: { fontFamily: fonts.bold },
+
+  taskSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.sm
+  },
+  taskSelectorLeft: { flexDirection: "row", alignItems: "center", flex: 1, gap: spacing.sm },
+  taskSelectorRight: {},
+  taskSelectorText: { flex: 1 },
+  taskSelectorLabel: { fontFamily: fonts.medium, marginBottom: 2 },
+  taskSelectorTitle: { fontFamily: fonts.bold },
 
   timerContainer: {
     flex: 1,
@@ -449,5 +652,70 @@ const styles = StyleSheet.create({
     color: "#4F46E5",
     flex: 1,
     lineHeight: 18
-  }
+  },
+
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end"
+  },
+  modalSheet: {
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+    maxHeight: "75%"
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginTop: spacing.md,
+    marginBottom: spacing.sm
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: spacing.md
+  },
+  modalTitle: { fontFamily: fonts.title },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  modalEmpty: {
+    alignItems: "center",
+    gap: spacing.md,
+    paddingVertical: spacing.xl
+  },
+  modalEmptyText: { fontFamily: fonts.medium, textAlign: "center" },
+  modalList: { flex: 1 },
+  taskItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    gap: spacing.sm
+  },
+  taskItemLeft: { flexDirection: "row", alignItems: "flex-start", flex: 1, gap: spacing.sm },
+  taskItemDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 5
+  },
+  taskItemText: { flex: 1 },
+  taskItemTitle: { fontFamily: fonts.bold, marginBottom: 4 },
+  taskItemMeta: { flexDirection: "row", alignItems: "center", gap: 4 },
+  taskItemTime: { fontFamily: fonts.medium }
 });

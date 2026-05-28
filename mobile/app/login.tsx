@@ -20,6 +20,7 @@ import { useResponsive } from "../src/hooks/useResponsive";
 import { AiBadge, AiPanel } from "../src/components/AiVisual";
 import { IconSymbol } from "../src/components/IconSymbol";
 import { useThemeMode } from "../src/context/ThemeContext";
+import { getApiErrorMessage } from "../src/services/userFeedback";
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
@@ -36,7 +37,7 @@ export default function LoginScreen() {
   async function handleLogin() {
     try {
       if (!email || !password) {
-        Alert.alert("Atencao", "Informe e-mail e senha.");
+        Alert.alert("Atenção", "Informe e-mail e senha.");
         return;
       }
       setIsSubmitting(true);
@@ -44,7 +45,7 @@ export default function LoginScreen() {
       router.replace("/home");
     } catch (error: any) {
       console.log("[LOGIN ERROR]", error?.response?.data || error);
-      Alert.alert("Erro ao entrar", error?.response?.data?.message || "Nao foi possivel fazer login.");
+      Alert.alert("Erro ao entrar", getApiErrorMessage(error, "Não foi possível fazer login."));
     } finally {
       setIsSubmitting(false);
     }

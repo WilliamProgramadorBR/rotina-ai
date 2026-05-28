@@ -19,6 +19,7 @@ import { colors, fonts, radius, shadow, spacing, scaledFont } from "../src/theme
 import { useResponsive } from "../src/hooks/useResponsive";
 import { IconSymbol } from "../src/components/IconSymbol";
 import { useThemeMode } from "../src/context/ThemeContext";
+import { getApiErrorMessage } from "../src/services/userFeedback";
 
 export default function RegisterScreen() {
   const { signUp } = useAuth() as any;
@@ -38,11 +39,11 @@ export default function RegisterScreen() {
   async function handleRegister() {
     try {
       if (!name || !email || !password) {
-        Alert.alert("Atencao", "Informe nome, e-mail e senha.");
+        Alert.alert("Atenção", "Informe nome, e-mail e senha.");
         return;
       }
       if (password !== confirmPassword) {
-        Alert.alert("Atencao", "As senhas nao conferem.");
+        Alert.alert("Atenção", "As senhas não conferem.");
         return;
       }
       if (!acceptedPrivacy) {
@@ -57,7 +58,7 @@ export default function RegisterScreen() {
       router.replace("/onboarding");
     } catch (error: any) {
       console.log("[REGISTER ERROR]", error?.response?.data || error);
-      Alert.alert("Erro ao cadastrar", error?.response?.data?.message || "Nao foi possivel criar a conta.");
+      Alert.alert("Erro ao cadastrar", getApiErrorMessage(error, "Não foi possível criar a conta."));
     } finally {
       setIsSubmitting(false);
     }

@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import { ZodError, z } from "zod";
 import { prisma } from "../lib/prisma";
 import { generateScheduleSuggestion } from "../services/ai-provider.service";
+import { generateDailyInsightsForUser } from "../services/dailyInsights.service";
 import {
   decryptReminder,
   decryptSchedule,
@@ -46,6 +47,15 @@ function normalizeLinks(links?: string[]) {
   return JSON.stringify(cleanedLinks);
 }
 
+function getTodayString() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
+}
+
 const aiRateLimit = createRateLimitPreHandler({
   scope: "ai",
   max: 10,
@@ -53,6 +63,16 @@ const aiRateLimit = createRateLimitPreHandler({
   keyFn: (req) => {
     const userId = (req as any).user?.sub;
     return userId ? `user:${userId}` : getClientIp(req);
+  }
+});
+
+const insightsRateLimit = createRateLimitPreHandler({
+  scope: "ai-insights",
+  max: 5,
+  windowMs: 60_000 * 60,
+  keyFn: (req) => {
+    const userId = (req as any).user?.sub;
+    return userId ? `insights:${userId}` : getClientIp(req);
   }
 });
 
@@ -255,6 +275,40 @@ export async function iaRoutes(app: FastifyInstance) {
     } catch (error: any) {
       request.log.error({ msg: String(error?.message || "").slice(0, 500), name: error?.name, code: error?.code });
       return reply.status(500).send({ message: "Não foi possível confirmar o reagendamento.", code: "RESCHEDULE_CONFIRM_FAILED" });
+    }
+  });
+
+  app.get("/daily-insights", { preHandler: [insightsRateLimit] }, async (request, reply) => {
+    try {
+      const userId = request.user.sub;
+      const today = getTodayString();
+
+      const cached = await prisma.aiDailyInsight.findUnique({
+        where: { userId_date: { userId, date: today } }
+      });
+
+      if (cached) {
+        return reply.send({
+          insights: JSON.parse(cached.insightsJson),
+          cached: true,
+          generatedAt: cached.createdAt
+        });
+      }
+
+      const insights = await generateDailyInsightsForUser(userId, today);
+
+      await prisma.aiDailyInsight.upsert({
+        where: { userId_date: { userId, date: today } },
+        update: { insightsJson: JSON.stringify(insights) },
+        create: { userId, date: today, insightsJson: JSON.stringify(insights) }
+      });
+
+      console.log("[DAILY_INSIGHTS] Gerado e cacheado", { userId, today, score: insights.score });
+
+      return reply.send({ insights, cached: false, generatedAt: insights.generatedAt });
+    } catch (error: any) {
+      request.log.error({ msg: String(error?.message || "").slice(0, 500), name: error?.name });
+      return reply.status(500).send({ message: "Não foi possível gerar os insights.", code: "INSIGHTS_FAILED" });
     }
   });
 }

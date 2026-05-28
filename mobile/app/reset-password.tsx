@@ -18,6 +18,7 @@ import { colors, fonts, radius, shadow, spacing, scaledFont } from "../src/theme
 import { useResponsive } from "../src/hooks/useResponsive";
 import { useThemeMode } from "../src/context/ThemeContext";
 import { IconSymbol } from "../src/components/IconSymbol";
+import { getApiErrorMessage } from "../src/services/userFeedback";
 
 const CODE_LENGTH = 6;
 
@@ -68,7 +69,7 @@ export default function ResetPasswordScreen() {
       await api.post("/auth/verify-reset-code", { email, code });
       setCodeVerified(true);
     } catch (e: any) {
-      Alert.alert("Código inválido", e?.response?.data?.message || "Código inválido ou expirado. Verifique e tente novamente.");
+      Alert.alert("Código inválido", getApiErrorMessage(e, "Código inválido ou expirado. Verifique e tente novamente."));
     } finally {
       setIsVerifying(false);
     }
@@ -88,7 +89,7 @@ export default function ResetPasswordScreen() {
       await api.post("/auth/reset-password", { email, code, newPassword });
       setDone(true);
     } catch (e: any) {
-      Alert.alert("Erro", e?.response?.data?.message || "Não foi possível redefinir a senha. Tente novamente.");
+      Alert.alert("Erro", getApiErrorMessage(e, "Não foi possível redefinir a senha. Tente novamente."));
     } finally {
       setIsSubmitting(false);
     }

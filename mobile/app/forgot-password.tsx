@@ -18,6 +18,7 @@ import { colors, fonts, radius, shadow, spacing, scaledFont } from "../src/theme
 import { useResponsive } from "../src/hooks/useResponsive";
 import { useThemeMode } from "../src/context/ThemeContext";
 import { IconSymbol } from "../src/components/IconSymbol";
+import { getApiErrorMessage } from "../src/services/userFeedback";
 
 export default function ForgotPasswordScreen() {
   const { width, isPhone, isPhoneLarge } = useResponsive();
@@ -42,7 +43,7 @@ export default function ForgotPasswordScreen() {
       setSent(true);
     } catch (e: any) {
       // Mostra mensagem genérica mesmo em caso de erro de servidor
-      Alert.alert("Erro", e?.response?.data?.message || "Não foi possível enviar o código. Tente novamente.");
+      Alert.alert("Erro", getApiErrorMessage(e, "Não foi possível enviar o código. Tente novamente."));
     } finally {
       setIsSubmitting(false);
     }
